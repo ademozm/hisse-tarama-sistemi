@@ -45,7 +45,9 @@ def send_message(text: str, parse_mode: str = "Markdown") -> bool:
             resp = requests.post(
                 url, data={"chat_id": chat_id, "text": text[i:i + 4000], "parse_mode": parse_mode}, timeout=15
             )
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                logger.warning(f"Telegram mesajı gönderilemedi: {resp.status_code} - {resp.text}")
+                return False
         return True
     except Exception as e:
         logger.warning(f"Telegram mesajı gönderilemedi: {e}")
@@ -64,7 +66,9 @@ def send_document(file_path: str, caption: str = "") -> bool:
                 url, data={"chat_id": chat_id, "caption": caption},
                 files={"document": f}, timeout=60,
             )
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                logger.warning(f"Telegram dosyası gönderilemedi: {resp.status_code} - {resp.text}")
+                return False
         return True
     except Exception as e:
         logger.warning(f"Telegram dosyası gönderilemedi: {e}")
