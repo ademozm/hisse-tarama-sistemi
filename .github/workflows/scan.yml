@@ -1,15 +1,30 @@
 name: Otomatik Hisse/Kripto Taraması
 
+# Bu dosya, GitHub'ın ÜCRETSİZ sunucularında sistemi otomatik ve
+# düzenli olarak çalıştırır — bilgisayarın kapalı olsa bile.
+#
+# Kurulum adımları README.md > "Bulutta Ücretsiz 7/24 Çalıştırma"
+# bölümünde detaylı anlatılıyor. Özetle:
+#   1. Bu projeyi bir GitHub deposuna (repository) yükle.
+#   2. Repo Settings > Secrets and variables > Actions altına
+#      TELEGRAM_BOT_TOKEN ve TELEGRAM_CHAT_ID ekle (bildirim istiyorsan).
+#   3. Repo Settings > Actions > General > "Read and write permissions" seç
+#      (raporun repoya otomatik kaydedilebilmesi için).
+#   4. Bu dosya otomatik devreye girer, aşağıdaki saatlerde çalışır.
+
 on:
   schedule:
+    # UTC saatleriyle yazılır. Aşağıdaki, Türkiye saatiyle (UTC+3)
+    # yaklaşık 10:30, 13:00, 16:00, 19:00'a denk gelir.
+    # Hafta içi (Pazartesi-Cuma) çalışır — piyasalar zaten hafta sonu kapalı.
     - cron: "30 7 * * 1-5"
     - cron: "0 10 * * 1-5"
     - cron: "0 13 * * 1-5"
     - cron: "0 16 * * 1-5"
-  workflow_dispatch:
+  workflow_dispatch:  # "Actions" sekmesinden elle de tetiklenebilir
 
 permissions:
-  contents: write
+  contents: write  # Raporu repoya commit edebilmek için
 
 jobs:
   scan:
@@ -33,7 +48,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main_scan.py --markets us bist crypto
+        run: python main_scan.py --markets us bist crypto gold
 
       - name: Raporu iş çıktısı (artifact) olarak sakla
         uses: actions/upload-artifact@v4
