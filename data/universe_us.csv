@@ -1,0 +1,41 @@
+symbol,market,name
+AAPL,us,Apple
+MSFT,us,Microsoft
+GOOGL,us,Alphabet
+AMZN,us,Amazon
+NVDA,us,NVIDIA
+META,us,Meta Platforms
+TSLA,us,Tesla
+BRK-B,us,Berkshire Hathaway
+JPM,us,JPMorgan Chase
+V,us,Visa
+UNH,us,UnitedHealth
+XOM,us,Exxon Mobil
+MA,us,Mastercard
+PG,us,Procter & Gamble
+JNJ,us,Johnson & Johnson
+HD,us,Home Depot
+COST,us,Costco
+MRK,us,Merck
+ABBV,us,AbbVie
+CVX,us,Chevron
+PEP,us,PepsiCo
+KO,us,Coca-Cola
+AVGO,us,Broadcom
+BAC,us,Bank of America
+WMT,us,Walmart
+CSCO,us,Cisco
+TMO,us,Thermo Fisher
+MCD,us,McDonald's
+ACN,us,Accenture
+ABT,us,Abbott Laboratories
+CRM,us,Salesforce
+LIN,us,Linde
+AMD,us,AMD
+DHR,us,Danaher
+NFLX,us,Netflix
+TXN,us,Texas Instruments
+NKE,us,Nike
+QCOM,us,Qualcomm
+PM,us,Philip Morris
+UPS,us,UPS

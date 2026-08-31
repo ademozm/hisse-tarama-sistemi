@@ -1,0 +1,16 @@
+symbol,market,name
+BTC-USD,crypto,Bitcoin
+ETH-USD,crypto,Ethereum
+BNB-USD,crypto,BNB
+SOL-USD,crypto,Solana
+XRP-USD,crypto,XRP
+ADA-USD,crypto,Cardano
+DOGE-USD,crypto,Dogecoin
+AVAX-USD,crypto,Avalanche
+DOT-USD,crypto,Polkadot
+LINK-USD,crypto,Chainlink
+MATIC-USD,crypto,Polygon
+LTC-USD,crypto,Litecoin
+TRX-USD,crypto,TRON
+ATOM-USD,crypto,Cosmos
+UNI-USD,crypto,Uniswap
