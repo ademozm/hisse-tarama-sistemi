@@ -152,6 +152,7 @@ def build_report(
     filtered_df: pd.DataFrame | None = None,
     filter_stats: dict | None = None,
     performance_stats_df: pd.DataFrame | None = None,
+    macro_news: list | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -169,13 +170,13 @@ def build_report(
                                   score_col="composite_score")
 
         # --- Piyasa bazlı tam sonuçlar ---
-        for market, label in [("us", "ABD"), ("bist", "BIST"), ("crypto", "Kripto")]:
+        for market, label in [("us", "ABD"), ("bist", "BIST"), ("crypto", "Kripto"), ("gold", "Altın")]:
             market_df = scored_df[scored_df["market"] == market] if not scored_df.empty else scored_df
             _write_generic_sheet(writer, market_df, label, DISPLAY_COLUMNS, COLUMN_LABELS,
                                   score_col="composite_score")
 
         # --- Temel analiz detayı ---
-        fundamental_df = scored_df[scored_df["market"] != "crypto"] if not scored_df.empty else scored_df
+        fundamental_df = scored_df[~scored_df["market"].isin(["crypto", "gold"])] if not scored_df.empty else scored_df
         _write_generic_sheet(writer, fundamental_df, "Temel Analiz", FUNDAMENTAL_COLUMNS, FUNDAMENTAL_LABELS)
 
         # --- Gelişmiş göstergeler (Fibonacci, destek/direnç, hacim profili) ---
@@ -196,6 +197,48 @@ def build_report(
                 "Sistem birkaç tarama sonra bu sayfayı otomatik dolduracak."
             ]})
             note_df.to_excel(writer, sheet_name="Performans Geçmişi", index=False)
+
+        # --- Haberler (sembol bazlı + ABD piyasasını genel etkileyen makro haberler) ---
+        news_rows = []
+        if not scored_df.empty and "latest_headline" in scored_df.columns:
+            news_cols = ["symbol", "name", "market", "news_sentiment", "news_count", "latest_headline"]
+            symbol_news_df = scored_df[[c for c in news_cols if c in scored_df.columns]].copy()
+            symbol_news_df = symbol_news_df.dropna(subset=["latest_headline"])
+            if not symbol_news_df.empty:
+                symbol_news_df["kaynak"] = "Sembol haberi"
+                symbol_news_df = symbol_news_df.rename(columns={
+                    "symbol": "Sembol", "name": "Şirket/Varlık", "market": "Piyasa",
+                    "news_sentiment": "Haber Tonu", "news_count": "Haber Sayısı",
+                    "latest_headline": "Başlık", "kaynak": "Kaynak",
+                })
+                news_rows.append(symbol_news_df)
+
+        if macro_news:
+            macro_df = pd.DataFrame(macro_news)
+            if not macro_df.empty:
+                macro_df = macro_df.rename(columns={
+                    "title": "Başlık", "publisher": "Yayıncı", "sentiment": "Haber Tonu", "kaynak": "Kaynak",
+                })
+                macro_df["Sembol"] = ""
+                macro_df["Şirket/Varlık"] = ""
+                macro_df["Piyasa"] = "makro"
+                news_rows.append(macro_df)
+
+        if news_rows:
+            combined_news = pd.concat(news_rows, ignore_index=True)
+            cols_order = [c for c in ["Kaynak", "Sembol", "Şirket/Varlık", "Piyasa", "Başlık", "Haber Tonu", "Yayıncı", "Haber Sayısı"] if c in combined_news.columns]
+            combined_news = combined_news[cols_order]
+            combined_news.to_excel(writer, sheet_name="Haberler", index=False)
+            ws = writer.sheets["Haberler"]
+            _style_sheet(ws, len(combined_news.columns), score_col_name="Haber Tonu", headers=list(combined_news.columns))
+            _autosize(ws, combined_news)
+        else:
+            note_df = pd.DataFrame({"Not": [
+                "Bu taramada haber verisi bulunamadı (--skip-news kullanılmış olabilir, "
+                "ya da yfinance o an için haber döndürmedi)."
+            ]})
+            note_df.to_excel(writer, sheet_name="Haberler", index=False)
+
 
         # --- Filtre özeti ---
         if filter_stats:

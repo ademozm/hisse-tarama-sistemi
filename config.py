@@ -16,6 +16,7 @@ UNIVERSE_FILES = {
     "us": os.path.join(DATA_DIR, "universe_us.csv"),
     "bist": os.path.join(DATA_DIR, "universe_bist.csv"),
     "crypto": os.path.join(DATA_DIR, "universe_crypto.csv"),
+    "gold": os.path.join(DATA_DIR, "universe_gold.csv"),
 }
 
 # Veri çekme ayarları
@@ -36,17 +37,22 @@ MAX_DAILY_RETURN_ABS = 0.60     # Tek günde >%60 hareket şüpheli veri kabul e
 # eksikse -bkz. fundamental_score kriptoda yok- ağırlık otomatik olarak mevcut
 # bileşenler arasında yeniden dağıtılır, bkz. analysis/scorer.py)
 SCORE_WEIGHTS = {
-    "signal_strength": 0.20,      # ADX / rejim netliği (teknik)
-    "momentum": 0.15,             # N günlük getiri (teknik)
-    "risk_reward": 0.10,          # hedef/stop mesafesi oranı (teknik)
-    "volatility_penalty": 0.10,   # aşırı volatilite cezası (teknik/risk)
-    "fundamental": 0.20,          # P/E, ROE, borç, büyüme (sadece hisseler)
-    "relative_strength": 0.15,    # endekse karşı göreceli performans
+    "signal_strength": 0.18,      # ADX / rejim netliği (teknik)
+    "momentum": 0.14,             # N günlük getiri (teknik)
+    "risk_reward": 0.09,          # hedef/stop mesafesi oranı (teknik)
+    "volatility_penalty": 0.09,   # aşırı volatilite cezası (teknik/risk)
+    "fundamental": 0.18,          # P/E, ROE, borç, büyüme (sadece hisseler)
+    "relative_strength": 0.14,    # endekse karşı göreceli performans
     "volume_confirmation": 0.05,  # hacim teyidi (AL/SAT yönüyle uyumlu mu)
     "mtf_confirmation": 0.05,     # haftalık trend teyidi
+    "news_sentiment": 0.08,       # haber tonu (basit anahtar kelime analizi, kaba gösterge)
 }
 MOMENTUM_LOOKBACK_DAYS = 20
 RELATIVE_STRENGTH_LOOKBACK_DAYS = 63
+
+# Haber çekimi de sembol başına ayrı istek gerektirir (yfinance .news).
+# Büyük evrenlerde yavaşlatabilir: main_scan.py --skip-news
+FETCH_NEWS_DEFAULT = True
 
 # Temel analiz verisi çekimi sembol başına ayrı istek gerektirdiği için
 # YAVAŞTIR. Büyük evrenlerde ilk denemede kapalı tutup teknik sonuçları

@@ -41,7 +41,7 @@ def test_send_message_calls_requests_post_when_configured(monkeypatch):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
 
     mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
+    mock_response.status_code = 200
     with patch("analysis.notifier.requests.post", return_value=mock_response) as mock_post:
         result = notifier.send_message("merhaba dünya")
         assert result is True
@@ -87,7 +87,7 @@ def test_notify_scan_complete_sends_message_and_file(monkeypatch, tmp_path):
     fake_file.write_text("dummy")
 
     mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
+    mock_response.status_code = 200
     with patch("analysis.notifier.requests.post", return_value=mock_response) as mock_post:
         result = notifier.notify_scan_complete(_scored_df(), {"başlangıç": 10, "son": 5}, str(fake_file))
         assert result is True

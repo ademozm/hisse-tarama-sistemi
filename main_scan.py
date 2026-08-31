@@ -29,7 +29,7 @@ from data_pipeline import fetcher, validator
 from analysis.strategy import RegimeAdaptiveStrategy
 from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
-    filters, advanced_indicators, journal, notifier,
+    filters, advanced_indicators, journal, notifier, news,
 )
 from reporting import excel_report
 
@@ -48,6 +48,7 @@ def run_scan(
     markets=None,
     use_cache=True,
     skip_fundamentals=False,
+    skip_news=False,
     filter_overrides=None,
     auto_refresh_universe=None,
     send_notification=True,
@@ -151,6 +152,24 @@ def run_scan(
         except Exception as e:
             logger.warning(f"{symbol} risk metriği hesaplanamadı: {e}")
 
+    # --- 8.5) Haber analizi (opsiyonel, sembol başına ayrı istek - yavaşlatabilir) ---
+    news_by_symbol = {}
+    macro_news = []
+    if not skip_news:
+        logger.info("Haber başlıkları çekiliyor (sembol bazlı + makro)...")
+        for symbol in signals_by_symbol.keys():
+            try:
+                news_by_symbol[symbol] = news.symbol_news_summary(symbol)
+            except Exception as e:
+                logger.warning(f"{symbol} için haber özeti hesaplanamadı: {e}")
+        try:
+            macro_news = news.fetch_macro_news()
+            logger.info(f"Makro haber başlığı: {len(macro_news)}")
+        except Exception as e:
+            logger.warning(f"Makro haberler çekilemedi: {e}")
+    else:
+        logger.info("Haber analizi atlandı (--skip-news).")
+
     # --- 9) Skorlama (tüm bileşenler birleşiyor) ---
     scored_df = scorer.score_universe(
         signals_by_symbol, universe_df,
@@ -158,6 +177,7 @@ def run_scan(
         relative_strength_df=rs_df,
         confirmations_by_symbol=confirmations_by_symbol,
         risk_metrics_by_symbol=risk_by_symbol,
+        news_by_symbol=news_by_symbol,
     )
     logger.info(f"Sinyal üreten sembol sayısı: {len(scored_df)}")
 
@@ -191,6 +211,7 @@ def run_scan(
         scored_df, validation_report, output_path,
         filtered_df=filtered_df, filter_stats=filter_stats,
         performance_stats_df=performance_stats_df,
+        macro_news=macro_news,
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---
@@ -209,10 +230,12 @@ def run_scan(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tam kapsamlı çoklu piyasa tarama sistemi")
-    parser.add_argument("--markets", nargs="+", default=None, choices=["us", "bist", "crypto"])
+    parser.add_argument("--markets", nargs="+", default=None, choices=["us", "bist", "crypto", "gold"])
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--skip-fundamentals", action="store_true",
                          help="Temel analiz çekimini atla (daha hızlı, sadece teknik+göreceli güç)")
+    parser.add_argument("--skip-news", action="store_true",
+                         help="Haber analizi çekimini atla (daha hızlı)")
     parser.add_argument("--min-score", type=float, default=None, help="Minimum |bileşik skor|")
     parser.add_argument("--only-buy", action="store_true", help="Sadece AL sinyallerini göster")
     parser.add_argument("--only-sell", action="store_true", help="Sadece SAT sinyallerini göster")
@@ -241,6 +264,7 @@ if __name__ == "__main__":
         markets=args.markets,
         use_cache=not args.no_cache,
         skip_fundamentals=args.skip_fundamentals,
+        skip_news=args.skip_news,
         filter_overrides=overrides,
         auto_refresh_universe=not args.no_auto_refresh,
         send_notification=not args.no_notify,

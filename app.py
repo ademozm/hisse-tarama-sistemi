@@ -47,7 +47,7 @@ st.caption("Teknik + temel analiz + göreceli güç + risk metrikleri birleşik 
 with st.sidebar:
     st.header("Tarama Ayarları")
 
-    markets_labels = {"ABD Hisseleri": "us", "BIST": "bist", "Kripto Paralar": "crypto"}
+    markets_labels = {"ABD Hisseleri (S&P 100)": "us", "BIST": "bist", "Kripto Paralar": "crypto", "Altın": "gold"}
     selected_labels = st.multiselect(
         "Hangi piyasalar taransın?",
         options=list(markets_labels.keys()),
@@ -61,6 +61,8 @@ with st.sidebar:
                              help="Kapatırsan her seferinde tüm veriler internetten yeniden çekilir")
     skip_fundamentals = st.checkbox("Temel analizi atla (çok daha hızlı)", value=False,
                                      help="P/E, ROE gibi verileri çekmez, sadece teknik + göreceli güç analizine bakar")
+    skip_news = st.checkbox("Haber analizini atla (daha hızlı)", value=False,
+                             help="Sembol bazlı ve makro haber başlıklarını çekmez")
 
     st.divider()
     st.subheader("Filtreler")
@@ -120,6 +122,7 @@ if run_clicked:
             markets=selected_markets,
             use_cache=use_cache,
             skip_fundamentals=skip_fundamentals,
+            skip_news=skip_news,
             filter_overrides=overrides,
             auto_refresh_universe=auto_refresh,
             send_notification=send_notify,

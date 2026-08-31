@@ -182,8 +182,72 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
    kural tabanlı bir modelin çıktısıdır, finansal tavsiye değildir.
    Kararların sorumluluğu sana aittir; gerekirse bir yatırım
    danışmanına başvur.
+8. **"Tüm borsa sembolleri" değil, "en önemli 100 + 100 + 100 + altın".**
+   Binlerce/on binlerce sembole (dünyadaki tüm hisseler, tüm kripto
+   paralar) erişim ücretli kurumsal veri sağlayıcı gerektirir. Bu sistem
+   bilinçli olarak ABD'nin en büyük 100 şirketi + BIST 100 + piyasa
+   değerine göre ilk 100 kripto + altına odaklanıyor — bu, "her şeyi
+   yüzeysel taramak" yerine "önemli olanı derinlemesine taramak" tercihi.
+9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
+   Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
-## 🆕 v3 — Profesyonel Otomasyon Özellikleri
+## 🆕 v4 — Genişletilmiş Kapsam: Top 100'ler, Altın, Haber Analizi
+
+### Neden "top 100" mantığı?
+
+BIST 100 gibi, artık ABD ve kripto piyasaları da "en önemli/en büyük 100"
+mantığıyla taranıyor — dağınık, kalitesiz sembollerle vakit kaybetmek
+yerine, gerçekten önemli olan hisselere odaklanıyoruz:
+
+| Piyasa | Kaynak | Kapsam |
+|---|---|---|
+| ABD | S&P 100 (Wikipedia, canlı çekim) | En büyük/en likit 100 ABD şirketi |
+| BIST | Elle derlenmiş, investing.com'un 30.08.2026 tarihli BIST 100 sayfasından | 80 doğrulanmış sembol (bkz. aşağıdaki dürüstlük notu) |
+| Kripto | CoinGecko (canlı çekim) | Piyasa değerine göre ilk 100 |
+| Altın | Statik | COMEX Altın Vadeli İşlemi (`GC=F`) |
+
+Daha geniş ABD kapsamı istersen: `python fetch_universe_lists.py --markets us --us-extended`
+(S&P 500 + Nasdaq-100 ekler, ama tarama süresi uzar).
+
+### BIST 100 listesi hakkında dürüstlük notu
+
+80 sembollük liste, investing.com'un canlı BIST 100 bileşen sayfasından
+şirket adı okunup ticker koduna **elle eşlenerek** oluşturuldu (BIST için
+güvenilir, ücretsiz, makine tarafından okunabilir bir kaynak yok). Bazı
+küçük/yeni halka arz olmuş şirketlerin ticker kodları belirsizliği
+nedeniyle listeye dahil edilmedi. Yanlış bir kod varsa, sistem bunu
+otomatik olarak "Hata Raporu" sayfasına düşürür, çökmez — ama %100
+doğruluk garantisi veremem. Endeks çeyreklik revize edildiği için
+(Ocak/Nisan/Temmuz/Ekim) listeyi periyodik olarak elle güncellemen
+gerekir. Güncel resmi liste: tr.investing.com/indices/ise-100-components
+
+### Altın analizi
+
+Diğer piyasalarla aynı teknik analiz motorundan geçer (rejim tespiti,
+Fibonacci, destek/direnç, hacim profili). Farkı: temel analiz (P/E vb.)
+uygulanmaz (kripto gibi, çünkü kavram yok) ve göreceli güç karşılaştırması
+yapılmaz (doğal bir "altın piyasası endeksi" yok).
+
+### Haber analizi
+
+Her taranan sembol için son haber başlıkları + basit bir "haber tonu"
+skoru, ayrıca ABD piyasasını genel etkileyen büyük göstergelerin (S&P 500,
+Dow, Nasdaq, 10 yıllık tahvil getirisi, dolar endeksi) haberleri —
+Fed açıklamaları, enflasyon verileri gibi "piyasayı geneli sarsan" haberler
+genelde bu göstergelerin haber akışında da görünür.
+
+**ÖNEMLİ DÜRÜSTLÜK NOTU:** Bu, yapay zeka destekli gerçek bir haber
+analizi DEĞİLDİR. Basit bir anahtar kelime sayımı yapıyor ("surge",
+"plunge", "beat", "miss" gibi kelimelerin metinde geçme sıklığına
+bakıyor). Bunun sebebi ücretsiz kalmak — gerçek NLP/LLM tabanlı analiz
+ücretli bir API gerektirir. Haber tonu skorunu **kaba bir gösterge**
+olarak kullan, kesin bir yargı olarak değil. Excel'deki "Haberler"
+sayfasından başlıkları okuyup kendi değerlendirmeni yapman en sağlıklısı.
+
+Hızlı taramak istersen: `python main_scan.py --skip-news` (sembol başına
+ayrı istek gerektirdiği için yavaşlatabilir, tıpkı `--skip-fundamentals` gibi).
+
+
 
 ### Gelişmiş teknik göstergeler
 
@@ -334,7 +398,10 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Sinyal günlüğü / performans takibi~~ ✅ tamamlandı
 - ~~Telegram bildirimleri~~ ✅ tamamlandı
 - ~~Bulutta ücretsiz otomatik çalıştırma~~ ✅ tamamlandı
+- ~~Genişletilmiş sembol kapsamı (S&P 100, BIST 100, kripto top 100, altın)~~ ✅ tamamlandı
+- ~~Haber analizi (sembol bazlı + makro)~~ ✅ tamamlandı (basit anahtar kelime tabanlı, gerçek NLP değil)
 - Walk-forward parametre optimizasyonu scripti (parametreler hâlâ optimize edilmedi — bkz. "Bilinen sınırlamalar")
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)
+- Gerçek NLP/LLM tabanlı haber duygu analizi (ücretli API gerektirir)
 

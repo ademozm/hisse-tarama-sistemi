@@ -62,6 +62,7 @@ def score_universe(
     relative_strength_df: pd.DataFrame | None = None,
     confirmations_by_symbol: dict | None = None,
     risk_metrics_by_symbol: dict | None = None,
+    news_by_symbol: dict | None = None,
 ) -> pd.DataFrame:
     """
     Ek parametrelerin hepsi OPSİYONELDİR — hiçbiri verilmezse sistem eski
@@ -127,6 +128,16 @@ def score_universe(
     if risk_metrics_by_symbol:
         risk_df = pd.DataFrame([{"symbol": s, **r} for s, r in risk_metrics_by_symbol.items()])
         result = result.merge(risk_df, on="symbol", how="left")
+
+    # --- Haber tonu (opsiyonel, kaba anahtar-kelime tabanlı sezgisel skor) ---
+    if news_by_symbol:
+        news_df = pd.DataFrame([{"symbol": s, **n} for s, n in news_by_symbol.items()])
+        result = result.merge(news_df, on="symbol", how="left")
+        if "news_sentiment" in result.columns:
+            # Sentiment -1..1 aralığında; sinyal yönüyle çarpılmadan önce 0..1'e ölçekle
+            # (pozitif sentiment AL sinyalini, negatif sentiment SAT sinyalini güçlendirir)
+            aligned_sentiment = result["news_sentiment"] * result["signal"]
+            score_components["news_sentiment"] = ((aligned_sentiment + 1) / 2).clip(0, 1)
 
     # --- Dinamik ağırlıklı ortalama: eksik bileşenler ağırlık dışı bırakılıp
     #     kalanlar yeniden normalize edilir (satır bazında) ---

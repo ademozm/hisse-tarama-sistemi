@@ -28,7 +28,7 @@ FIELDS = [
 
 def fetch_one(symbol: str, market: str) -> dict:
     """Tek sembol için temel veriyi çeker. Kripto için boş dict döner."""
-    if market == "crypto":
+    if market in ("crypto", "gold"):
         return {}
 
     result = {f: None for f in FIELDS}
