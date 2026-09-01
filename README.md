@@ -191,7 +191,74 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
-## 🆕 v4 — Genişletilmiş Kapsam: Top 100'ler, Altın, Haber Analizi
+## 🆕 v5 — Çok Kaynaklı Doğrulama, Mum Formasyonları, Pozisyon Büyüklüğü, Ekonomik Takvim
+
+### Altın veri sorunu neden yaşandı, nasıl çözüldü
+
+`GC=F` (COMEX altın vadeli işlemi) bir vadeli işlem sözleşmesiydi — bu tür
+sözleşmeler rollover (sözleşme devri) dönemlerinde ve Yahoo Finance'in
+emtia veri hattında hisse senetlerine göre daha sık boşluk/eksiklik
+yaşıyor. Sembol artık `XAUUSD=X` (spot altın/dolar, forex-tarzı sürekli
+kota) — çok daha kararlı bir veri akışı sağlıyor.
+
+### İkinci, bağımsız veri kaynağı: Stooq.com
+
+`data_pipeline/stooq_fetcher.py`, tamamen ücretsiz ve API key
+gerektirmeyen Stooq.com'u iki şekilde kullanır:
+
+1. **Yedek kaynak**: yfinance bir sembol için tüm denemelerinde
+   başarısız olursa (rate limit, geçici sunucu sorunu), sistem otomatik
+   olarak Stooq'u dener. ABD hisseleri, kripto paralar ve altın için
+   çalışır; BIST için Stooq güvenilir kapsam sağlamadığından uygulanmaz.
+2. **Çapraz doğrulama**: Sinyal üreten her sembol için hem yfinance hem
+   Stooq'tan son kapanış fiyatı karşılaştırılır. İki kaynak %3'ten fazla
+   farklıysa, Excel raporunda "Veri Şüpheli mi" sütunu işaretlenir —
+   kör güven yerine iki bağımsız kaynağın birbirini denetlemesi.
+
+Atlamak istersen: `python main_scan.py --skip-cross-validation`
+
+### Mum formasyonu (candlestick pattern) tanıma
+
+`analysis/candlestick_patterns.py`, klasik formasyonları (doji, çekiç,
+kayan yıldız, boğa/ayı yutan formasyonu) OHLC verisinden tespit eder,
+"Gelişmiş Göstergeler" sayfasına ek sütun olarak eklenir.
+
+**Dürüstlük notu:** Mum formasyonları tek başına güvenilir bir sinyal
+değildir — akademik literatür karışık sonuçlar veriyor. Trend/rejim ve
+diğer göstergelerle BİRLİKTE bir teyit katmanı olarak kullanın.
+
+### Pozisyon büyüklüğü önerisi
+
+`analysis/position_sizing.py`, bir sinyali "kaç hisse/kripto/lot al"a
+çevirir — ATR tabanlı stop mesafesine göre, hesabının sabit bir yüzdesini
+(varsayılan %1) riske atacak şekilde boyutlandırma yapar. Bu, "sinyal
+listesi" ile "gerçek bir trade sistemi" arasındaki en önemli farklardan
+biridir.
+
+```bash
+python main_scan.py --account-size 50000 --risk-pct 1.5
+```
+
+Streamlit arayüzünde de "Pozisyon Büyüklüğü" bölümünden ayarlanabilir.
+
+**Dürüstlük notu:** Bu bir öneri motorudur, kesin talimat değil. Aynı
+anda birden fazla sinyal takip ediyorsan, pozisyonlar arası korelasyona
+(örn. aynı sektörden 5 hisse aynı anda AL sinyali verirse bunlar
+bağımsız riskler değildir) dikkat etmen gerekir — sistem şu an
+portföy-seviyesi korelasyon kontrolü yapmıyor.
+
+### Ekonomik takvim
+
+`analysis/economic_calendar.py`, önümüzdeki 14 gün içinde FOMC (Fed
+faiz kararı), NFP (istihdam) veya CPI (enflasyon) açıklaması var mı
+kontrol eder — "Ekonomik Takvim" sayfasında görünür. Az önce sorduğun
+"ABD'deki açıklamalar önemli oluyor" konusuna doğrudan cevap.
+
+**Dürüstlük notu:** FOMC tarihleri Fed'in resmi 2026 takviminden alındı
+ama yılda bir elle güncellenmesi gerekir. NFP/CPI tarihleri **yaklaşık**
+kurallara dayanır (kesin gün için bls.gov'un resmi takvimine bakılmalı).
+
+
 
 ### Neden "top 100" mantığı?
 
@@ -400,8 +467,14 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Bulutta ücretsiz otomatik çalıştırma~~ ✅ tamamlandı
 - ~~Genişletilmiş sembol kapsamı (S&P 100, BIST 100, kripto top 100, altın)~~ ✅ tamamlandı
 - ~~Haber analizi (sembol bazlı + makro)~~ ✅ tamamlandı (basit anahtar kelime tabanlı, gerçek NLP değil)
+- ~~İkinci/bağımsız veri kaynağı (Stooq) + çapraz doğrulama~~ ✅ tamamlandı
+- ~~Mum formasyonu tanıma~~ ✅ tamamlandı
+- ~~Pozisyon büyüklüğü önerisi~~ ✅ tamamlandı
+- ~~Ekonomik takvim (FOMC/NFP/CPI)~~ ✅ tamamlandı
 - Walk-forward parametre optimizasyonu scripti (parametreler hâlâ optimize edilmedi — bkz. "Bilinen sınırlamalar")
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)
 - Gerçek NLP/LLM tabanlı haber duygu analizi (ücretli API gerektirir)
+- Portföy-seviyesi korelasyon kontrolü (birden fazla sinyal arasındaki bağımlılık analizi)
+- Ichimoku Cloud, Stochastic osilatör gibi ek teknik göstergeler
 
