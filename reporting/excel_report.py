@@ -25,7 +25,8 @@ DISPLAY_COLUMNS = [
     "symbol", "name", "market", "signal", "regime", "composite_score",
     "close", "momentum_return_pct", "relative_strength_pct", "risk_reward",
     "atr_pct", "adx", "rsi", "fundamental_score", "relative_volume",
-    "volume_confirmed", "mtf_confirmed",
+    "volume_confirmed", "mtf_confirmed", "stooq_close", "fark_yuzde", "supheli",
+    "onerilen_adet", "pozisyon_buyuklugu", "portfoy_yuzdesi",
 ]
 
 COLUMN_LABELS = {
@@ -36,6 +37,10 @@ COLUMN_LABELS = {
     "atr_pct": "ATR %", "adx": "ADX", "rsi": "RSI",
     "fundamental_score": "Temel Skor", "relative_volume": "Bağıl Hacim",
     "volume_confirmed": "Hacim Teyidi", "mtf_confirmed": "Haftalık Teyit",
+    "stooq_close": "Stooq Kapanış (2. Kaynak)", "fark_yuzde": "Kaynak Farkı %",
+    "supheli": "Veri Şüpheli mi",
+    "onerilen_adet": "Önerilen Adet", "pozisyon_buyuklugu": "Pozisyon Büyüklüğü ($)",
+    "portfoy_yuzdesi": "Portföy Yüzdesi %",
 }
 
 FUNDAMENTAL_COLUMNS = [
@@ -73,6 +78,7 @@ ADVANCED_COLUMNS = [
     "fib_trend_direction", "nearest_fib_level", "nearest_fib_distance_pct",
     "support_levels", "resistance_levels", "poc_price",
     "value_area_low", "value_area_high",
+    "candlestick_pattern", "candlestick_direction",
 ]
 ADVANCED_LABELS = {
     "symbol": "Sembol", "name": "Şirket/Varlık", "market": "Piyasa",
@@ -82,6 +88,7 @@ ADVANCED_LABELS = {
     "support_levels": "Destek Seviyeleri", "resistance_levels": "Direnç Seviyeleri",
     "poc_price": "POC (Hacim Odağı)", "value_area_low": "Değer Alanı Alt",
     "value_area_high": "Değer Alanı Üst",
+    "candlestick_pattern": "Mum Formasyonu", "candlestick_direction": "Formasyon Yönü",
 }
 
 
@@ -128,7 +135,7 @@ def _write_generic_sheet(writer, df: pd.DataFrame, sheet_name: str, columns, lab
     display_df = df[[c for c in columns if c in df.columns]].copy()
     if "signal" in display_df.columns:
         display_df["signal"] = display_df["signal"].map({1: "AL", -1: "SAT"})
-    for bool_col in ("volume_confirmed", "mtf_confirmed"):
+    for bool_col in ("volume_confirmed", "mtf_confirmed", "supheli"):
         if bool_col in display_df.columns:
             display_df[bool_col] = display_df[bool_col].map({True: "Evet", False: "Hayır"}).fillna("N/A")
     for list_col in ("support_levels", "resistance_levels"):
@@ -153,6 +160,7 @@ def build_report(
     filter_stats: dict | None = None,
     performance_stats_df: pd.DataFrame | None = None,
     macro_news: list | None = None,
+    calendar_df: pd.DataFrame | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -239,6 +247,21 @@ def build_report(
             ]})
             note_df.to_excel(writer, sheet_name="Haberler", index=False)
 
+
+        # --- Ekonomik takvim (yaklaşan Fed toplantıları, önemli veri açıklamaları) ---
+        if calendar_df is not None and not calendar_df.empty:
+            calendar_display = calendar_df.rename(columns={
+                "tarih": "Tarih", "olay": "Olay", "kalan_gun": "Kalan Gün", "onem": "Önem",
+            })
+            calendar_display.to_excel(writer, sheet_name="Ekonomik Takvim", index=False)
+            ws = writer.sheets["Ekonomik Takvim"]
+            _style_sheet(ws, len(calendar_display.columns))
+            _autosize(ws, calendar_display)
+        else:
+            note_df = pd.DataFrame({"Not": [
+                "Önümüzdeki 14 gün içinde bilinen önemli bir ekonomik olay (FOMC, NFP, CPI) yok."
+            ]})
+            note_df.to_excel(writer, sheet_name="Ekonomik Takvim", index=False)
 
         # --- Filtre özeti ---
         if filter_stats:
