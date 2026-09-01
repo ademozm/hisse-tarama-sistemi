@@ -25,11 +25,12 @@ import pandas as pd
 
 import config
 import universe
-from data_pipeline import fetcher, validator
+from data_pipeline import fetcher, validator, stooq_fetcher
 from analysis.strategy import RegimeAdaptiveStrategy
 from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
+    position_sizing, economic_calendar,
 )
 from reporting import excel_report
 
@@ -49,10 +50,13 @@ def run_scan(
     use_cache=True,
     skip_fundamentals=False,
     skip_news=False,
+    skip_cross_validation=False,
     filter_overrides=None,
     auto_refresh_universe=None,
     send_notification=True,
     update_journal=True,
+    account_size=10000.0,
+    risk_per_trade_pct=1.0,
 ) -> str:
     start_time = datetime.now()
     logger.info(f"Tarama başladı. Piyasalar: {markets or 'hepsi'}")
@@ -73,11 +77,14 @@ def run_scan(
     symbols = universe_df["symbol"].tolist()
     logger.info(f"Evren büyüklüğü: {len(symbols)} sembol")
 
-    # --- 1) Fiyat verisi çek ---
-    fetch_result = fetcher.fetch_universe(symbols, use_cache=use_cache)
+    # --- 1) Fiyat verisi çek (yfinance öncelikli, başarısızsa Stooq'a düşer) ---
+    market_by_symbol = universe_df.set_index("symbol")["market"].to_dict()
+    fetch_result = fetcher.fetch_universe(symbols, use_cache=use_cache, market_by_symbol=market_by_symbol)
+    stooq_fallback_count = sum(1 for s in fetch_result.sources.values() if "stooq" in s)
     logger.info(
         f"Veri çekildi: {len(fetch_result.data)} başarılı "
-        f"({len(fetch_result.from_cache)} cache'den), {len(fetch_result.failed)} başarısız"
+        f"({len(fetch_result.from_cache)} cache'den, {stooq_fallback_count} Stooq yedeğinden), "
+        f"{len(fetch_result.failed)} başarısız"
     )
 
     # --- 2) Doğrula ---
@@ -135,7 +142,6 @@ def run_scan(
     # --- 8) Hacim / haftalık trend teyidi + risk metrikleri ---
     confirmations_by_symbol = {}
     risk_by_symbol = {}
-    market_by_symbol = universe_df.set_index("symbol")["market"].to_dict()
     for symbol, sig_df in signals_by_symbol.items():
         last_signal = int(sig_df.iloc[-1]["signal"])
         try:
@@ -186,6 +192,30 @@ def run_scan(
         adv_df = pd.DataFrame([{"symbol": s, **a} for s, a in advanced_by_symbol.items()])
         scored_df = scored_df.merge(adv_df, on="symbol", how="left")
 
+    # --- 9.5) Çapraz doğrulama (sadece sinyal üreten semboller için, Stooq ile karşılaştırma) ---
+    if not skip_cross_validation and not scored_df.empty:
+        logger.info("Çapraz doğrulama yapılıyor (Stooq ile fiyat karşılaştırması)...")
+        cross_val_rows = []
+        for _, row in scored_df.iterrows():
+            try:
+                cv = stooq_fetcher.cross_validate(row["symbol"], row["market"], row["close"])
+            except Exception as e:
+                logger.warning(f"{row['symbol']} çapraz doğrulama başarısız: {e}")
+                cv = {"stooq_close": None, "fark_yuzde": None, "supheli": False}
+            cross_val_rows.append({"symbol": row["symbol"], **cv})
+        cross_val_df = pd.DataFrame(cross_val_rows)
+        scored_df = scored_df.merge(cross_val_df, on="symbol", how="left")
+        supheli_count = scored_df["supheli"].sum() if "supheli" in scored_df.columns else 0
+        if supheli_count > 0:
+            logger.warning(f"{supheli_count} sembolde yfinance/Stooq fiyat uyuşmazlığı tespit edildi (bkz. rapor).")
+    else:
+        logger.info("Çapraz doğrulama atlandı (--skip-cross-validation).")
+
+    # --- 9.7) Pozisyon büyüklüğü önerisi ---
+    if not scored_df.empty:
+        scored_df = position_sizing.compute_for_scored_df(scored_df, account_size, risk_per_trade_pct)
+        logger.info(f"Pozisyon büyüklüğü önerileri hesaplandı (hesap: {account_size}, risk: %{risk_per_trade_pct})")
+
     # --- 10) Filtreleme ---
     active_filters = dict(config.FILTERS)
     if filter_overrides:
@@ -205,6 +235,10 @@ def run_scan(
             logger.warning(f"Sinyal günlüğü güncellenemedi: {e}")
 
     # --- 12) Excel raporu ---
+    calendar_df = economic_calendar.get_calendar()
+    if not calendar_df.empty:
+        logger.info(f"Yaklaşan {len(calendar_df)} önemli ekonomik olay bulundu.")
+
     timestamp = start_time.strftime("%Y%m%d_%H%M%S")
     output_path = os.path.join(config.REPORTS_DIR, f"tarama_{timestamp}.xlsx")
     excel_report.build_report(
@@ -212,6 +246,7 @@ def run_scan(
         filtered_df=filtered_df, filter_stats=filter_stats,
         performance_stats_df=performance_stats_df,
         macro_news=macro_news,
+        calendar_df=calendar_df,
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---
@@ -236,6 +271,8 @@ if __name__ == "__main__":
                          help="Temel analiz çekimini atla (daha hızlı, sadece teknik+göreceli güç)")
     parser.add_argument("--skip-news", action="store_true",
                          help="Haber analizi çekimini atla (daha hızlı)")
+    parser.add_argument("--skip-cross-validation", action="store_true",
+                         help="Stooq ile çapraz fiyat doğrulamasını atla (daha hızlı)")
     parser.add_argument("--min-score", type=float, default=None, help="Minimum |bileşik skor|")
     parser.add_argument("--only-buy", action="store_true", help="Sadece AL sinyallerini göster")
     parser.add_argument("--only-sell", action="store_true", help="Sadece SAT sinyallerini göster")
@@ -245,6 +282,10 @@ if __name__ == "__main__":
     parser.add_argument("--no-auto-refresh", action="store_true",
                          help="Sembol listelerini otomatik güncelleme")
     parser.add_argument("--no-journal", action="store_true", help="Sinyal günlüğüne kaydetme")
+    parser.add_argument("--account-size", type=float, default=10000.0,
+                         help="Pozisyon büyüklüğü önerisi için varsayımsal hesap büyüklüğü ($)")
+    parser.add_argument("--risk-pct", type=float, default=1.0,
+                         help="İşlem başına riske edilecek hesap yüzdesi (varsayılan %%1)")
     args = parser.parse_args()
 
     allowed_signals = None
@@ -265,8 +306,11 @@ if __name__ == "__main__":
         use_cache=not args.no_cache,
         skip_fundamentals=args.skip_fundamentals,
         skip_news=args.skip_news,
+        skip_cross_validation=args.skip_cross_validation,
         filter_overrides=overrides,
         auto_refresh_universe=not args.no_auto_refresh,
         send_notification=not args.no_notify,
         update_journal=not args.no_journal,
+        account_size=args.account_size,
+        risk_per_trade_pct=args.risk_pct,
     )

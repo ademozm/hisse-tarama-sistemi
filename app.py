@@ -73,6 +73,13 @@ with st.sidebar:
     max_pe = st.number_input("Maks. F/K oranı (boş/0=filtre yok)", min_value=0.0, value=0.0, step=5.0)
 
     st.divider()
+    st.subheader("Pozisyon Büyüklüğü")
+    account_size = st.number_input("Varsayımsal hesap büyüklüğü ($)", min_value=100.0, value=10000.0, step=500.0,
+                                    help="Sadece öneri hesaplamak için kullanılır, gerçek hesabına dokunmaz")
+    risk_pct = st.slider("İşlem başına risk (%)", 0.25, 5.0, 1.0, 0.25,
+                          help="Profesyoneller genelde %1-2 arası önerir")
+
+    st.divider()
     st.subheader("Otomasyon")
     auto_refresh = st.checkbox("Sembol listelerini otomatik güncelle", value=True,
                                 help="7 günden eski listeleri taramadan önce otomatik tazeler")
@@ -127,6 +134,8 @@ if run_clicked:
             auto_refresh_universe=auto_refresh,
             send_notification=send_notify,
             update_journal=update_journal,
+            account_size=account_size,
+            risk_per_trade_pct=risk_pct,
         )
         st.session_state.last_report_path = output_path
         elapsed = time.time() - start
