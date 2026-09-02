@@ -17,7 +17,7 @@ import pandas as pd
 import yfinance as yf
 
 import config
-from data_pipeline import cache
+from data_pipeline import cache, stooq_fetcher
 
 logger = logging.getLogger("fetcher")
 
@@ -27,6 +27,7 @@ class FetchResult:
     data: dict = field(default_factory=dict)     # symbol -> DataFrame
     failed: dict = field(default_factory=dict)    # symbol -> hata mesajı
     from_cache: set = field(default_factory=set)  # cache'den gelen semboller
+    sources: dict = field(default_factory=dict)   # symbol -> "yfinance" | "stooq (yedek)"
 
 
 def _fetch_one(symbol: str, period: str, interval: str) -> pd.DataFrame:
@@ -55,7 +56,15 @@ def fetch_universe(
     period: str = None,
     interval: str = None,
     use_cache: bool = True,
+    market_by_symbol: dict = None,
 ) -> FetchResult:
+    """
+    market_by_symbol: {symbol: market} eşlemesi verilirse, yfinance bir
+    sembol için tüm denemelerinde başarısız olursa, Stooq.com'dan (ikinci,
+    bağımsız bir kaynak) o sembolü çekmeyi dener. BIST için Stooq güvenilir
+    kapsam sağlamadığından oraya düşülmez (bkz. stooq_fetcher.map_to_stooq).
+    Verilmezse (None), sadece yfinance kullanılır — geriye dönük uyumluluk.
+    """
     period = period or config.FETCH_PERIOD
     interval = interval or config.FETCH_INTERVAL
     result = FetchResult()
@@ -78,9 +87,25 @@ def fetch_universe(
             try:
                 df = _fetch_one(sym, period, interval)
                 result.data[sym] = df
+                result.sources[sym] = "yfinance"
                 cache.set_cached(sym, interval, df)
             except Exception as e:
-                result.failed[sym] = str(e)
+                # yfinance tükendi; market biliniyorsa Stooq'u dene (ikinci kaynak)
+                fallback_df = None
+                if market_by_symbol is not None:
+                    market = market_by_symbol.get(sym)
+                    try:
+                        fallback_df = stooq_fetcher.fetch_with_fallback(sym, market)
+                    except Exception as stooq_err:
+                        logger.warning(f"{sym} Stooq yedeği de başarısız: {stooq_err}")
+
+                if fallback_df is not None and len(fallback_df) >= config.MIN_ROWS_REQUIRED:
+                    logger.info(f"{sym}: yfinance başarısız oldu, Stooq'tan (yedek kaynak) alındı.")
+                    result.data[sym] = fallback_df
+                    result.sources[sym] = "stooq (yedek)"
+                    cache.set_cached(sym, interval, fallback_df)
+                else:
+                    result.failed[sym] = str(e)
         if i + config.FETCH_BATCH_SIZE < len(to_fetch):
             time.sleep(config.FETCH_BATCH_DELAY_SEC)
 
