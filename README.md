@@ -4,7 +4,7 @@ Gün içi birden fazla kez çalışabilen, ABD hisseleri + BIST + kripto
 paraları tarayan, rejim-uyarlamalı (trend/yatay) sinyal üreten, sonuçları
 skorlayıp Excel raporu olarak sunan uçtan uca bir sistem.
 
-## 🖱️ Tarayıcıda Panel (terminal komutu yazmadan kullanmak için)
+## 🖱️ Tarayıcıda Görsel Panel (terminal komutu yazmadan kullanmak için)
 
 Kurulumu bir kere yaptıktan sonra (aşağıdaki "Kurulum" bölümü), her
 seferinde terminale komut yazmak yerine:
@@ -13,10 +13,28 @@ seferinde terminale komut yazmak yerine:
 - **Mac:** `uygulamayi_baslat.command` dosyasına çift tıkla (ilk seferinde
   sağ tık → "Aç" demen gerekebilir, Mac güvenlik uyarısı verir)
 
-Birkaç saniye sonra tarayıcında (Chrome/Edge) otomatik bir sekme açılır:
-piyasaları kutucuklarla seçip **"Taramayı Başlat"** butonuna basman
-yeterli. Sonuçlar renkli tablo halinde aynı sayfada görünür, Excel
-dosyasını da oradan indirebilirsin.
+Birkaç saniye sonra tarayıcında (Chrome/Edge) otomatik bir sekme açılır.
+Bu artık sadece bir tablo değil, **gerçek bir görsel panel**:
+
+- **KPI kartları**: toplam sinyal, AL/SAT sayısı, ortalama skor, şüpheli
+  veri sayısı, yaklaşan önemli ekonomik olay sayısı — bir bakışta özet
+- **📊 Genel Bakış sekmesi**: piyasa dağılımı (pasta grafik), skor
+  dağılımı (histogram), en iyi 10 AL/SAT (çubuk grafik)
+- **📈 Grafik İnceleme sekmesi**: istediğin sembolü seç, interaktif mum
+  grafiği + EMA çizgileri + destek/direnç seviyeleri + hacim grafiği
+  açılsın
+- **💼 Piyasalar, 🔬 Temel & Risk & Gelişmiş, ⚠️ Hata Raporu**: detaylı
+  tablolar, renk skalalı skorlar
+- **🎯 Grid & DCA sekmesi**: grid seviyelerini merdiven grafiğinde, DCA
+  planını basamaklı çizgide gör
+- **📰 Haberler sekmesi**: renkli ton göstergeli haber kartları
+- **📅 Ekonomik Takvim sekmesi**: yaklaşan Fed/NFP/CPI olayları kart
+  görünümünde
+- **📜 Geçmiş Performans sekmesi**: sinyallerin zaman içindeki başarı
+  istatistikleri
+
+Excel dosyasını da aynı sayfadan indirebilirsin — panel, Excel'in
+YERİNE değil, ONA EK bir görselleştirme katmanı.
 
 Kapatmak için tarayıcı sekmesini kapat, sonra açılan siyah pencereyi de
 kapatabilirsin (veya bir tuşa basıp devam et).
@@ -190,6 +208,26 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
    yüzeysel taramak" yerine "önemli olanı derinlemesine taramak" tercihi.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
+
+## 🆕 v7 — Görsel Panel: Grafikler, KPI Kartları, Sekmeli Detaylı Tasarım
+
+Streamlit arayüzü, ham tablolardan gerçek bir görsel panele dönüştürüldü:
+
+- `reporting/dashboard_charts.py` — Plotly ile üretilen, Streamlit'ten
+  BAĞIMSIZ, pytest ile test edilen saf grafik fonksiyonları (16 test).
+  Bu ayrım bilinçli: grafik mantığı tarayıcı açmadan doğrulanabiliyor.
+- Mum grafiği için veri kaynağı: `data_pipeline/cache.py`'nin zaten
+  diskte tuttuğu (parquet) fiyat verisi — ekstra bir indirme gerekmiyor,
+  bir önceki taramanın verisi tekrar kullanılıyor.
+- 9 sekme: Genel Bakış, Grafik İnceleme, Piyasalar, Temel & Risk &
+  Gelişmiş, Grid & DCA, Haberler, Ekonomik Takvim, Geçmiş Performans,
+  Hata Raporu.
+
+**Doğrulama notu:** Streamlit'in kendisi interaktif olduğu için otomatik
+testler tarayıcı etkileşimini simüle edemiyor — bunun yerine app.py'nin
+tarama-sonrası TÜM veri işleme mantığı (Excel okuma, liste ayrıştırma,
+cache erişimi, grafik üretimi), gerçek bir rapor üzerinde Streamlit'siz
+ayrıca çalıştırılıp doğrulandı (40 sembol, tüm sekmeler, sıfır hata).
 
 ## 🆕 v6 — Grid ve DCA Strateji Planları
 
@@ -505,6 +543,7 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Pozisyon büyüklüğü önerisi~~ ✅ tamamlandı
 - ~~Ekonomik takvim (FOMC/NFP/CPI)~~ ✅ tamamlandı
 - ~~Grid ve DCA strateji planları~~ ✅ tamamlandı
+- ~~Görsel panel: grafikler, KPI kartları, sekmeli detaylı tasarım~~ ✅ tamamlandı
 - Walk-forward parametre optimizasyonu scripti (parametreler hâlâ optimize edilmedi — bkz. "Bilinen sınırlamalar")
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)
