@@ -191,7 +191,40 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
-## 🆕 v5 — Çok Kaynaklı Doğrulama, Mum Formasyonları, Pozisyon Büyüklüğü, Ekonomik Takvim
+## 🆕 v6 — Grid ve DCA Strateji Planları
+
+Bu, [OctoBot](https://github.com/Drakkar-Software/OctoBot) (Fransız açık
+kaynaklı kripto trading botu) incelenirken ortaya çıkan bir istek üzerine
+eklendi. **OctoBot'un kodu kopyalanmadı** (GPL-3.0 lisanslı olduğu için
+kopyalamak bizim projeyi de GPL yapardı) — Grid ve DCA zaten genel,
+herkese açık trading kavramları olduğu için kendi mantığımızla,
+sıfırdan yazıldı.
+
+**En önemli fark:** OctoBot gerçek borsa hesabına bağlanıp otomatik emir
+gönderiyor. Bu sistem HİÇBİR ZAMAN gerçek emir göndermez — sadece bir
+plan/öneri üretir, sen ister elle uygularsın, ister borsanın kendi
+Grid Bot özelliğine bu seviyeleri girersin.
+
+### Grid planı
+
+Sadece **yatay (range) rejimindeki** semboller için anlamlıdır (trend
+halindeki sembollerde fiyat tek yöne kaçabileceği için grid stratejisi
+önerilmez). Son 60 günlük fiyat aralığı N eşit dilime bölünür, her dilim
+için bir AL fiyatı + bir SAT fiyatı (bir dilim üstü) hesaplanır.
+"Grid Planı" sayfasında.
+
+### DCA (kademeli alım) planı
+
+AL sinyali üreten semboller için, tek seferde büyük pozisyon açmak
+yerine bütçeyi 4 dilime bölüp fiyat düştükçe kademeli alım önerir
+(varsayılan: her dilim %5 daha düşük fiyatta tetiklenir). "DCA Planı"
+sayfasında.
+
+**Dürüstlük notu:** Fiyat öngörülen seviyelere hiç gelmeyebilir — bu
+DCA'nın doğasında var, "bazı dilimler hiç alınmadı" normal bir sonuçtur,
+hata değildir.
+
+
 
 ### Altın veri sorunu neden yaşandı, nasıl çözüldü
 
@@ -471,6 +504,7 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Mum formasyonu tanıma~~ ✅ tamamlandı
 - ~~Pozisyon büyüklüğü önerisi~~ ✅ tamamlandı
 - ~~Ekonomik takvim (FOMC/NFP/CPI)~~ ✅ tamamlandı
+- ~~Grid ve DCA strateji planları~~ ✅ tamamlandı
 - Walk-forward parametre optimizasyonu scripti (parametreler hâlâ optimize edilmedi — bkz. "Bilinen sınırlamalar")
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)

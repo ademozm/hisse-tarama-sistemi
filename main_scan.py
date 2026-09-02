@@ -30,7 +30,7 @@ from analysis.strategy import RegimeAdaptiveStrategy
 from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
-    position_sizing, economic_calendar,
+    position_sizing, economic_calendar, grid_strategy, dca_plan,
 )
 from reporting import excel_report
 
@@ -216,6 +216,42 @@ def run_scan(
         scored_df = position_sizing.compute_for_scored_df(scored_df, account_size, risk_per_trade_pct)
         logger.info(f"Pozisyon büyüklüğü önerileri hesaplandı (hesap: {account_size}, risk: %{risk_per_trade_pct})")
 
+    # --- 9.8) Grid ve DCA plan önerileri ---
+    grid_rows = []
+    dca_rows = []
+    if not scored_df.empty:
+        for _, row in scored_df.iterrows():
+            symbol = row["symbol"]
+            pozisyon = row.get("pozisyon_buyuklugu")
+            if pd.isna(pozisyon) or pozisyon is None or symbol not in signals_by_symbol:
+                continue
+
+            # Grid: sadece range (yatay) rejimindeki semboller için anlamlı
+            try:
+                grid_result = grid_strategy.suggest_grid(
+                    signals_by_symbol[symbol], row.get("regime"), float(pozisyon)
+                )
+                if grid_result["uygun_mu"]:
+                    for lvl in grid_result["seviyeler"]:
+                        grid_rows.append({"symbol": symbol, **lvl})
+            except Exception as e:
+                logger.warning(f"{symbol} için grid planı hesaplanamadı: {e}")
+
+            # DCA: sadece AL sinyali olan semboller için (kademeli satış standart değil)
+            if row.get("signal") == 1:
+                try:
+                    plan = dca_plan.suggest_dca_plan(float(row["close"]), float(pozisyon))
+                    dca_df_part = dca_plan.dca_plan_to_dataframe(symbol, plan)
+                    if not dca_df_part.empty:
+                        dca_rows.append(dca_df_part)
+                except Exception as e:
+                    logger.warning(f"{symbol} için DCA planı hesaplanamadı: {e}")
+
+    grid_plan_df = pd.DataFrame(grid_rows) if grid_rows else pd.DataFrame()
+    dca_plan_df = pd.concat(dca_rows, ignore_index=True) if dca_rows else pd.DataFrame()
+    logger.info(f"Grid planı: {grid_plan_df['symbol'].nunique() if not grid_plan_df.empty else 0} sembol, "
+                f"DCA planı: {dca_plan_df['symbol'].nunique() if not dca_plan_df.empty else 0} sembol")
+
     # --- 10) Filtreleme ---
     active_filters = dict(config.FILTERS)
     if filter_overrides:
@@ -247,6 +283,8 @@ def run_scan(
         performance_stats_df=performance_stats_df,
         macro_news=macro_news,
         calendar_df=calendar_df,
+        grid_plan_df=grid_plan_df,
+        dca_plan_df=dca_plan_df,
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---
