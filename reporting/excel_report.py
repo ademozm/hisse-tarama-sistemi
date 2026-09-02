@@ -161,6 +161,8 @@ def build_report(
     performance_stats_df: pd.DataFrame | None = None,
     macro_news: list | None = None,
     calendar_df: pd.DataFrame | None = None,
+    grid_plan_df: pd.DataFrame | None = None,
+    dca_plan_df: pd.DataFrame | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -262,6 +264,35 @@ def build_report(
                 "Önümüzdeki 14 gün içinde bilinen önemli bir ekonomik olay (FOMC, NFP, CPI) yok."
             ]})
             note_df.to_excel(writer, sheet_name="Ekonomik Takvim", index=False)
+
+        # --- Grid strateji planı (sadece yatay/range rejimindeki semboller) ---
+        if grid_plan_df is not None and not grid_plan_df.empty:
+            grid_display = grid_plan_df.rename(columns={
+                "symbol": "Sembol", "seviye": "Seviye", "al_fiyati": "Al Fiyatı",
+                "sat_fiyati": "Sat Fiyatı", "adet": "Adet", "beklenen_kar_pct": "Beklenen Kâr %",
+            })
+            grid_display.to_excel(writer, sheet_name="Grid Planı", index=False)
+            ws = writer.sheets["Grid Planı"]
+            _style_sheet(ws, len(grid_display.columns))
+            _autosize(ws, grid_display)
+        else:
+            pd.DataFrame({"Not": ["Bu taramada yatay (range) rejiminde, grid stratejisine uygun sembol bulunamadı."]}
+                         ).to_excel(writer, sheet_name="Grid Planı", index=False)
+
+        # --- DCA (kademeli alım) planı ---
+        if dca_plan_df is not None and not dca_plan_df.empty:
+            dca_display = dca_plan_df.rename(columns={
+                "symbol": "Sembol", "dilim": "Dilim", "tetik_fiyati": "Tetik Fiyatı",
+                "fiyat_dususu_pct": "Fiyat Düşüşü %", "tutar": "Tutar ($)",
+                "adet": "Adet", "kumulatif_tutar": "Kümülatif Tutar ($)",
+            })
+            dca_display.to_excel(writer, sheet_name="DCA Planı", index=False)
+            ws = writer.sheets["DCA Planı"]
+            _style_sheet(ws, len(dca_display.columns))
+            _autosize(ws, dca_display)
+        else:
+            pd.DataFrame({"Not": ["Bu taramada AL sinyali üreten sembol bulunamadı, DCA planı oluşturulmadı."]}
+                         ).to_excel(writer, sheet_name="DCA Planı", index=False)
 
         # --- Filtre özeti ---
         if filter_stats:
