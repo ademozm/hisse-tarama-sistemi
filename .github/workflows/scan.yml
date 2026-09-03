@@ -48,7 +48,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main_scan.py --markets us bist crypto gold
+        run: python main_scan.py --markets us bist crypto emtia forex
 
       - name: Raporu iş çıktısı (artifact) olarak sakla
         uses: actions/upload-artifact@v4
