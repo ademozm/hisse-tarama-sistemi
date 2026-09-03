@@ -22,7 +22,7 @@ tr.investing.com/indices/ise-100-components
 Kripto listesi CoinGecko'nun ücretsiz public API'siyle piyasa değerine göre
 ilk N coin çekilir (varsayılan 100, API key gerekmez).
 
-Altın (gold/emtia) statik bir liste, güncelleme gerektirmez (COMEX vadeli
+Emtia ve d00f6viz kurlar0131 statik listelerdir, g00fcncelleme gerektirmez (COMEX vadeli
 işlem sembolü değişmez).
 """
 import argparse
@@ -91,8 +91,9 @@ def update_crypto(top_n: int = 100) -> pd.DataFrame:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tam hisse/kripto listelerini güncelle")
     parser.add_argument("--markets", nargs="+", default=["us", "crypto"],
-                         choices=["us", "bist", "crypto", "gold"])
-    parser.add_argument("--crypto-top-n", type=int, default=100)
+                         choices=["us", "bist", "crypto", "emtia", "forex"])
+    parser.add_argument("--crypto-top-n", type=int, default=200,
+                         help="Piyasa değerine göre ilk N kripto para (varsayılan 200, önceden 100'dü)")
     parser.add_argument("--us-extended", action="store_true",
                          help="Sadece top 100 değil, S&P 500 + Nasdaq-100'ü de dahil et (daha yavaş tarama)")
     args = parser.parse_args()
@@ -112,7 +113,11 @@ if __name__ == "__main__":
               f"{config.UNIVERSE_FILES['bist']} dosyasını elle güncellemen gerekiyor "
               "(bkz. dosyanın başındaki not, veya tr.investing.com/indices/ise-100-components).")
 
-    if "gold" in args.markets:
-        print("Altın listesi statiktir, güncelleme gerekmez (data/universe_gold.csv).")
+    if "emtia" in args.markets:
+        print("Emtia listesi statiktir, güncelleme gerekmez (data/universe_emtia.csv).")
+
+    if "forex" in args.markets:
+        print("Döviz kuru listesi statiktir, güncelleme gerekmez (data/universe_forex.csv). "
+              "Yeni bir döviz çifti eklemek istersen dosyayı elle düzenleyebilirsin.")
 
     print("\nBitti. main_scan.py bir sonraki çalıştırmada güncel listeleri kullanacak.")
