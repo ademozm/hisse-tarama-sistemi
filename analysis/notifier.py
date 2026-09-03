@@ -78,9 +78,13 @@ def send_document(file_path: str, caption: str = "") -> bool:
 def build_summary_message(scored_df, filter_stats: dict = None, top_n: int = None) -> str:
     """Tarama sonucundan okunabilir bir Telegram mesajı üretir."""
     top_n = top_n or config.NOTIFY_TOP_N
+    panel_url = os.environ.get(config.STREAMLIT_APP_URL_ENV)
 
     if scored_df is None or scored_df.empty:
-        return "📊 *Tarama tamamlandı*\nBu taramada sinyal üreten sembol bulunamadı."
+        msg = "📊 *Tarama tamamlandı*\nBu taramada sinyal üreten sembol bulunamadı."
+        if panel_url:
+            msg += f"\n\n📱 [Paneli aç]({panel_url})"
+        return msg
 
     lines = ["📊 *Tarama Sonucu*\n"]
     if filter_stats:
@@ -99,6 +103,9 @@ def build_summary_message(scored_df, filter_stats: dict = None, top_n: int = Non
         lines.append("\n🔴 *En iyi SAT sinyalleri:*")
         for _, row in sells.iterrows():
             lines.append(f"  {row['symbol']} ({row['market']}) — skor: {row['composite_score']:.2f}")
+
+    if panel_url:
+        lines.append(f"\n📱 [Tüm sonuçları görsel panelde aç]({panel_url})")
 
     return "\n".join(lines)
 
