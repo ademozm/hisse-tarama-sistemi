@@ -179,10 +179,11 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
    açabilir. Cache + batch + delay bunu azaltır ama sıfırlamaz.
    Ölçek büyüdükçe ücretli bir sağlayıcıya (Polygon.io, Finnhub,
    Alpaca Data) geçmeyi düşün.
-3. **Parametreler optimize edilmedi.** ADX eşiği, RSI seviyeleri, ATR
-   çarpanları makul varsayılan değerlerdir. Gerçek kullanım için
-   walk-forward / out-of-sample optimizasyon şart — yoksa overfitting
-   (veriye ezberleme) riski var.
+3. **Varsayılan parametreler otomatik optimize edilmiyor.** ADX eşiği,
+   RSI seviyeleri, ATR çarpanları makul varsayılan değerlerdir. Artık
+   bunları `run_walk_forward.py` ile optimize edebilirsin (bkz. "v8"
+   bölümü) ama sonuç main_scan.py'ye OTOMATİK yansımaz — bulduğun
+   parametreleri `analysis/strategy.py`'ye elle girmen gerekiyor.
 6. **Temel analiz çekimi yavaştır.** yfinance'in `.info` çağrısı sembol
    başına ayrı bir HTTP isteğidir. Büyük evrenlerde (yüzlerce sembol)
    tam tarama birkaç dakika sürebilir. Hızlı sonuç istiyorsan
@@ -208,6 +209,48 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
    yüzeysel taramak" yerine "önemli olanı derinlemesine taramak" tercihi.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
+
+## 🆕 v8 — Walk-Forward Optimizasyon ve Detaylı Backtest
+
+[Backtrader](https://github.com/mementum/backtrader) (GPL-3.0 lisanslı,
+kod kopyalanmadı — aynı OctoBot gerekçesiyle) incelenirken ortaya çıkan
+bir istek üzerine, README'de uzun süredir "yapılmadı" diye not düşülen
+gerçek bir boşluk kapatıldı.
+
+### Detaylandırılmış backtest motoru
+
+`analysis/backtest.py` artık şunları da hesaplıyor:
+- **Sortino oranı** (Sharpe'tan farkı: sadece aşağı yönlü oynaklığı
+  cezalandırır, yukarı yönlü oynaklığı "risk" saymaz — daha adil)
+- **Profit factor** (toplam kazanç / toplam kayıp)
+- **Ortalama kazanç/kayıp yüzdesi**, ardışık en uzun kazanç/kayıp serisi
+- **Maruz kalma süresi** (%) — sermayenin ne kadar süre piyasada olduğu
+- **Buy & Hold karşılaştırması** — stratejinin sadece "al ve tut"tan
+  gerçekten daha iyi olup olmadığı
+
+### Walk-forward parametre optimizasyonu
+
+`analysis/walk_forward.py` + `run_walk_forward.py`: bir sembol için
+geçmiş veriyi kayan pencerelere böler, her pencerede parametreleri
+SADECE eğitim bölümünde optimize edip SADECE test (görülmemiş) bölümünde
+değerlendirir. Bu, "tüm geçmişte en iyi parametreleri bul" gibi klasik
+bir overfitting tuzağına düşmeden, gerçekten genelleyen parametreler
+bulmaya çalışır.
+
+```bash
+python run_walk_forward.py --symbol AAPL --period 3y
+python run_walk_forward.py --symbol THYAO.IS --period 5y --train-days 300 --test-days 90
+```
+
+**Sadece tek sembol için çalışır** (tüm evrende çok yavaş olurdu) ve
+**sonuçları otomatik uygulamaz** — bulunan "önerilen parametreleri"
+`analysis/strategy.py`'ye elle girmen gerekiyor, bilinçli bir karar
+olsun diye.
+
+**Dürüstlük notu — bu gerçekten önemli:** Walk-forward, overfitting
+riskini azaltır ama SIFIRLAMAZ. Sistem eğitim/test performansı arasında
+büyük fark görürse "overfitting uyarısı" verir — bunu ciddiye al. Hiçbir
+optimizasyon yöntemi gelecekteki performansı garanti etmez.
 
 ## 🆕 v7 — Görsel Panel: Grafikler, KPI Kartları, Sekmeli Detaylı Tasarım
 
@@ -544,7 +587,7 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Ekonomik takvim (FOMC/NFP/CPI)~~ ✅ tamamlandı
 - ~~Grid ve DCA strateji planları~~ ✅ tamamlandı
 - ~~Görsel panel: grafikler, KPI kartları, sekmeli detaylı tasarım~~ ✅ tamamlandı
-- Walk-forward parametre optimizasyonu scripti (parametreler hâlâ optimize edilmedi — bkz. "Bilinen sınırlamalar")
+- ~~Walk-forward parametre optimizasyonu scripti~~ ✅ tamamlandı (`run_walk_forward.py`)
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)
 - Gerçek NLP/LLM tabanlı haber duygu analizi (ücretli API gerektirir)
