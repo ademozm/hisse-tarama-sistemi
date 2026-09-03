@@ -1,0 +1,6 @@
+symbol,market,name
+USDTRY=X,forex,Dolar/Türk Lirası
+EURTRY=X,forex,Euro/Türk Lirası
+EURUSD=X,forex,Euro/Dolar
+GBPUSD=X,forex,Sterlin/Dolar
+USDJPY=X,forex,Dolar/Yen
