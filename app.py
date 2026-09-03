@@ -88,7 +88,8 @@ st.caption("Teknik + temel analiz + göreceli güç + risk + haber + grid/DCA �
 with st.sidebar:
     st.header("Tarama Ayarları")
 
-    markets_labels = {"ABD Hisseleri (S&P 100)": "us", "BIST": "bist", "Kripto Paralar": "crypto", "Altın": "gold"}
+    markets_labels = {"ABD Hisseleri (S&P 100)": "us", "BIST": "bist", "Kripto Paralar": "crypto",
+                       "Emtialar (Altın/Gümüş/Petrol/Doğalgaz)": "emtia", "Döviz Kurları (USD/TRY dahil)": "forex"}
     selected_labels = st.multiselect("Hangi piyasalar taransın?", options=list(markets_labels.keys()),
                                       default=list(markets_labels.keys()))
     selected_markets = [markets_labels[l] for l in selected_labels]
@@ -121,8 +122,23 @@ with st.sidebar:
     run_clicked = st.button("🔍 Taramayı Başlat", type="primary", use_container_width=True)
 
 
+def _find_latest_report() -> str | None:
+    """reports/ klasöründeki en son (dosya adına göre en yeni) Excel raporunu bulur.
+    GitHub Actions gibi otomatik taramalar sonucu oluşan raporu, panel
+    açılır açılmaz göstermek için kullanılır."""
+    if not os.path.isdir(config.REPORTS_DIR):
+        return None
+    xlsx_files = [f for f in os.listdir(config.REPORTS_DIR) if f.endswith(".xlsx") and f.startswith("tarama_")]
+    if not xlsx_files:
+        return None
+    xlsx_files.sort(reverse=True)  # dosya adı YYYYMMDD_HHMMSS içerdiği için alfabetik = kronolojik
+    return os.path.join(config.REPORTS_DIR, xlsx_files[0])
+
+
 if "last_report_path" not in st.session_state:
-    st.session_state.last_report_path = None
+    # Panel ilk açıldığında (örn. Telegram linkinden), elle tarama yapmadan
+    # önce otomatik taramanın (GitHub Actions) en son ürettiği raporu göster
+    st.session_state.last_report_path = _find_latest_report()
 
 if run_clicked:
     if not selected_markets:
@@ -172,6 +188,13 @@ if st.session_state.last_report_path and os.path.exists(st.session_state.last_re
     path = st.session_state.last_report_path
     sheets = pd.read_excel(path, sheet_name=None)
     ozet = sheets.get("Özet", pd.DataFrame())
+
+    report_time = os.path.getmtime(path)
+    report_dt = pd.Timestamp.fromtimestamp(report_time)
+    if not run_clicked:
+        st.caption(f"📄 Otomatik bulunan en son rapor gösteriliyor — {report_dt.strftime('%d.%m.%Y %H:%M')} "
+                   f"tarihli (muhtemelen otomatik/bulut taramasından). Kendi kriterlerinle yeni bir tarama "
+                   f"için soldan ayarları seçip 'Taramayı Başlat'a bas.")
 
     st.divider()
     with open(path, "rb") as f:
@@ -254,9 +277,9 @@ if st.session_state.last_report_path and os.path.exists(st.session_state.last_re
                     mc3.metric("RSI", f"{r.get('RSI', 0):.1f}" if pd.notna(r.get("RSI")) else "-")
                     mc4.metric("ADX", f"{r.get('ADX', 0):.1f}" if pd.notna(r.get("ADX")) else "-")
 
-    # ---- 3) Piyasalar (ABD/BIST/Kripto/Altın tabloları) ----
+    # ---- 3) Piyasalar (ABD/BIST/Kripto/Emtia/Döviz tabloları) ----
     with tabs[2]:
-        market_tab_names = [n for n in ["ABD", "BIST", "Kripto", "Altın"] if n in sheets]
+        market_tab_names = [n for n in ["ABD", "BIST", "Kripto", "Emtialar", "Döviz"] if n in sheets]
         if market_tab_names:
             market_tabs = st.tabs(market_tab_names)
             for mtab, mname in zip(market_tabs, market_tab_names):
@@ -361,7 +384,7 @@ else:
     st.info("Soldaki ayarları seç ve **'Taramayı Başlat'** butonuna bas.")
     st.markdown("""
     **İlk kez mi kullanıyorsun?**
-    1. Soldan taramak istediğin piyasaları seç (ABD / BIST / Kripto / Altın)
+    1. Soldan taramak istediğin piyasaları seç (ABD / BIST / Kripto / Emtia / Döviz)
     2. Hızlı bir deneme için "Temel analizi atla" kutucuğunu işaretle
     3. "Taramayı Başlat" butonuna bas
     4. Birkaç dakika sonra: KPI kartları, grafikler ve sekmeli detaylı sonuçlar burada görünecek

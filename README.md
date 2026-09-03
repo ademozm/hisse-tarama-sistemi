@@ -210,6 +210,85 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
+## 🆕 v9 — Genişletilmiş Kapsam (Emtia, Döviz) ve Kritik Veri Hatası Düzeltmesi
+
+### Altın hatasının kök sebebi bulundu ve düzeltildi
+
+`data_pipeline/fetcher.py`'de gerçek bir hata vardı: forex-tarzı sembollerde
+(altın gibi) Yahoo Finance genelde Hacim (Volume) verisi vermez — tüm
+satırlarda `NaN` olabilir. Eski kod, veriyi temizlerken **5 sütunu (OHLC +
+Volume) birden** kontrol ediyordu; Volume sürekli boşsa bu **TÜM satırları
+sessizce siliyordu** (hata fırlatmadan). Bu, "bazen çalışıyor bazen
+çalışmıyor" davranışının kök sebebiydi. Artık sadece asıl fiyat
+sütunlarında (Open/High/Low/Close) eksik veri varsa satır atılıyor; eksik
+Hacim 0 ile dolduruluyor. Aynı hata `data_pipeline/stooq_fetcher.py`'de de
+vardı, o da düzeltildi. `fetcher.py`'nin daha önce **hiç testi yoktu** —
+şimdi bu spesifik senaryoyu (`test_fetch_one_all_nan_volume_does_not_wipe_all_rows`)
+kapsayan 11 test eklendi.
+
+### Ek denetimde bulunan başka bir hata
+
+`excel_report.py`'de "bilinmiyor" değerleri için `"N/A"` metni
+kullanılıyordu — ama pandas, Excel dosyasını geri okurken `"N/A"` metnini
+otomatik olarak **eksik veri (NaN)** sayıyor. Bu, rapor tekrar okunduğunda
+(örn. Streamlit panelinde) verinin sessizce kaybolmasına yol açıyordu.
+`"Bilinmiyor"` ile değiştirildi. Bu tür round-trip hatalarını yakalamak
+için `data_pipeline/cache.py` ve `reporting/excel_report.py`'ye de
+(önceden hiç testi olmayan iki modül) test eklendi.
+
+### Genişletilmiş piyasa kapsamı
+
+Önceki tek satırlık "Altın" piyasası, **"Emtia"** olarak genişletildi:
+
+| Sembol | Ne |
+|---|---|
+| `XAUUSD=X` | Altın (spot) |
+| `XAGUSD=X` | Gümüş (spot) |
+| `CL=F` | Ham petrol (WTI vadeli) |
+| `NG=F` | Doğalgaz (Henry Hub vadeli) |
+
+Tamamen yeni bir **"Döviz Kurları"** piyasası eklendi (Türk kullanıcı için
+özellikle USD/TRY dahil):
+
+| Sembol | Ne |
+|---|---|
+| `USDTRY=X` | Dolar/Türk Lirası |
+| `EURTRY=X` | Euro/Türk Lirası |
+| `EURUSD=X` | Euro/Dolar |
+| `GBPUSD=X` | Sterlin/Dolar |
+| `USDJPY=X` | Dolar/Yen |
+
+Kripto varsayılan kapsamı da **100 → 200**'e çıkarıldı
+(`fetch_universe_lists.py --crypto-top-n 200`, varsayılan artık bu).
+
+```bash
+python main_scan.py --markets us bist crypto emtia forex
+```
+
+**Eski `--markets gold` artık çalışmıyor**, yerine `emtia` kullan. Kendi
+`.bat`/otomasyon komutlarında bu ismi güncellemen gerekebilir.
+
+### Telegram bildirimine panel linki
+
+Artık Telegram mesajları, ayarlarsan (`STREAMLIT_APP_URL` ortam
+değişkeni), tıklanabilir bir **"📱 Paneli aç"** linki içeriyor. Bunun
+çalışması için paneli **Streamlit Community Cloud**'a (ücretsiz) deploy
+etmen gerekiyor:
+
+1. [share.streamlit.io](https://share.streamlit.io) adresine git, GitHub
+   hesabınla giriş yap
+2. **"New app"** → deponu ve `app.py` dosyasını seç → **"Deploy"**
+3. Birkaç dakika sonra `https://kullanici-adi-depo-adi.streamlit.app`
+   gibi kalıcı bir link alırsın
+4. Bu linki GitHub deponda **Settings → Secrets and variables → Actions**
+   altına `STREAMLIT_APP_URL` adıyla ekle
+
+Streamlit Cloud, GitHub'a her push'ta (GitHub Actions'ın otomatik
+taramadan sonra rapor/veritabanını depoya kaydetmesi dahil) **otomatik
+olarak yeniden dağıtım yapar** — yani panel açıldığında her zaman en
+güncel taramanın sonucunu gösterir (`app.py` artık açılışta
+`reports/` klasöründeki en son raporu otomatik buluyor).
+
 ## 🆕 v8 — Walk-Forward Optimizasyon ve Detaylı Backtest
 
 [Backtrader](https://github.com/mementum/backtrader) (GPL-3.0 lisanslı,
@@ -587,6 +666,8 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Ekonomik takvim (FOMC/NFP/CPI)~~ ✅ tamamlandı
 - ~~Grid ve DCA strateji planları~~ ✅ tamamlandı
 - ~~Görsel panel: grafikler, KPI kartları, sekmeli detaylı tasarım~~ ✅ tamamlandı
+- ~~Genişletilmiş piyasa kapsamı (Emtia, Döviz) + kritik veri hatası düzeltmesi~~ ✅ tamamlandı
+- ~~Telegram bildirimine panel linki~~ ✅ tamamlandı (Streamlit Cloud deploy gerektirir)
 - ~~Walk-forward parametre optimizasyonu scripti~~ ✅ tamamlandı (`run_walk_forward.py`)
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)

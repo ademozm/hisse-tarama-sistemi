@@ -16,7 +16,8 @@ UNIVERSE_FILES = {
     "us": os.path.join(DATA_DIR, "universe_us.csv"),
     "bist": os.path.join(DATA_DIR, "universe_bist.csv"),
     "crypto": os.path.join(DATA_DIR, "universe_crypto.csv"),
-    "gold": os.path.join(DATA_DIR, "universe_gold.csv"),
+    "emtia": os.path.join(DATA_DIR, "universe_emtia.csv"),
+    "forex": os.path.join(DATA_DIR, "universe_forex.csv"),
 }
 
 # Veri çekme ayarları
@@ -89,4 +90,7 @@ JOURNAL_MAX_OPEN_DAYS = 30
 #   GitHub Actions: repo Settings > Secrets olarak eklenir (bkz. README)
 TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
 TELEGRAM_CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
+# Streamlit Community Cloud'a deploy ettiğin panelin genel (public) linki.
+# Ayarlarsan, Telegram bildirimlerine otomatik olarak "panele git" linki eklenir.
+STREAMLIT_APP_URL_ENV = "STREAMLIT_APP_URL"
 NOTIFY_TOP_N = 10  # Bildirimde gösterilecek en iyi kaç sinyal

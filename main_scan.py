@@ -303,7 +303,7 @@ def run_scan(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tam kapsamlı çoklu piyasa tarama sistemi")
-    parser.add_argument("--markets", nargs="+", default=None, choices=["us", "bist", "crypto", "gold"])
+    parser.add_argument("--markets", nargs="+", default=None, choices=["us", "bist", "crypto", "emtia", "forex"])
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--skip-fundamentals", action="store_true",
                          help="Temel analiz çekimini atla (daha hızlı, sadece teknik+göreceli güç)")
