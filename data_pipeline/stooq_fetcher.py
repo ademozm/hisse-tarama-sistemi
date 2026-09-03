@@ -30,7 +30,14 @@ SPECIAL_MAP = {
     "GC=F": "xauusd",
     "XAUUSD=X": "xauusd",
     "SI=F": "xagusd",
+    "XAGUSD=X": "xagusd",
     "CL=F": "cl.f",
+    "NG=F": "ng.f",
+    "USDTRY=X": "usdtry",
+    "EURTRY=X": "eurtry",
+    "EURUSD=X": "eurusd",
+    "GBPUSD=X": "gbpusd",
+    "USDJPY=X": "usdjpy",
 }
 
 
@@ -42,8 +49,12 @@ def map_to_stooq(symbol: str, market: str) -> str | None:
     if market == "bist":
         return None  # Stooq'ta BIST kapsamı güvenilir değil
 
-    if market == "gold":
-        return "xauusd"
+    if market in ("emtia", "forex"):
+        # SPECIAL_MAP'te olmayan bir emtia/döviz sembolü varsa (kullanıcı
+        # kendi CSV'sine ekleyebilir) genel bir tahmin yapılmıyor —
+        # bu piyasalarda sembol formatı çok değişken, yanlış tahmin
+        # sessizce yanlış veriye yol açabilir. Elle SPECIAL_MAP'e eklenmeli.
+        return None
 
     if market == "crypto":
         # "BTC-USD" -> "btcusd"
@@ -77,7 +88,11 @@ def fetch_stooq(stooq_symbol: str, timeout: int = 15) -> pd.DataFrame | None:
 
         df["Date"] = pd.to_datetime(df["Date"])
         df = df.set_index("Date").sort_index()
-        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        # fetcher.py'deki aynı sebeple: Volume NaN diye tüm satırı silme,
+        # sadece asıl fiyat sütunlarında NaN varsa at.
+        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+        df["Volume"] = df["Volume"].fillna(0)
+        df = df.dropna(subset=["Open", "High", "Low", "Close"])
         return df if len(df) > 0 else None
     except Exception as e:
         logger.debug(f"Stooq'tan {stooq_symbol} çekilemedi: {e}")

@@ -42,7 +42,22 @@ def _fetch_one(symbol: str, period: str, interval: str) -> pd.DataFrame:
                 df.columns = df.columns.get_level_values(0)
             if df.empty:
                 raise ValueError("Boş veri döndü")
-            return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+
+            # ÖNEMLİ: Forex-tarzı sembollerde (örn. XAUUSD=X gibi altın spot
+            # fiyatı) Yahoo Finance genelde Hacim (Volume) verisi vermez —
+            # tüm satırlarda NaN olabilir. Eskiden buradaki .dropna() 5
+            # sütunu BİRDEN kontrol ediyordu; Volume sürekli NaN olan bir
+            # sembolde bu TÜM satırları silip sessizce boş bir tablo
+            # üretiyordu (hata fırlatmadan). Şimdi sadece asıl fiyat
+            # sütunlarında (Open/High/Low/Close) NaN varsa o satır atılıyor;
+            # eksik Hacim 0 ile dolduruluyor.
+            result_df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+            result_df["Volume"] = result_df["Volume"].fillna(0)
+            result_df = result_df.dropna(subset=["Open", "High", "Low", "Close"])
+
+            if result_df.empty:
+                raise ValueError("Fiyat verisi (Open/High/Low/Close) tamamen boş döndü")
+            return result_df
         except Exception as e:
             last_err = e
             logger.warning(f"{symbol} deneme {attempt}/{config.FETCH_MAX_RETRIES} başarısız: {e}")
