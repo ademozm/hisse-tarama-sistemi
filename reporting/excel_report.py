@@ -137,7 +137,10 @@ def _write_generic_sheet(writer, df: pd.DataFrame, sheet_name: str, columns, lab
         display_df["signal"] = display_df["signal"].map({1: "AL", -1: "SAT"})
     for bool_col in ("volume_confirmed", "mtf_confirmed", "supheli"):
         if bool_col in display_df.columns:
-            display_df[bool_col] = display_df[bool_col].map({True: "Evet", False: "Hayır"}).fillna("N/A")
+            # NOT: "N/A" KULLANMA — pandas Excel'den geri okurken "N/A" metnini
+            # otomatik olarak eksik veri (NaN) sayıyor, bu da rapor tekrar
+            # okunduğunda (örn. Streamlit panelinde) veri sessizce kayboluyor.
+            display_df[bool_col] = display_df[bool_col].map({True: "Evet", False: "Hayır"}).fillna("Bilinmiyor")
     for list_col in ("support_levels", "resistance_levels"):
         if list_col in display_df.columns:
             display_df[list_col] = display_df[list_col].apply(
@@ -180,13 +183,14 @@ def build_report(
                                   score_col="composite_score")
 
         # --- Piyasa bazlı tam sonuçlar ---
-        for market, label in [("us", "ABD"), ("bist", "BIST"), ("crypto", "Kripto"), ("gold", "Altın")]:
+        for market, label in [("us", "ABD"), ("bist", "BIST"), ("crypto", "Kripto"),
+                               ("emtia", "Emtialar"), ("forex", "Döviz")]:
             market_df = scored_df[scored_df["market"] == market] if not scored_df.empty else scored_df
             _write_generic_sheet(writer, market_df, label, DISPLAY_COLUMNS, COLUMN_LABELS,
                                   score_col="composite_score")
 
         # --- Temel analiz detayı ---
-        fundamental_df = scored_df[~scored_df["market"].isin(["crypto", "gold"])] if not scored_df.empty else scored_df
+        fundamental_df = scored_df[~scored_df["market"].isin(["crypto", "emtia", "forex"])] if not scored_df.empty else scored_df
         _write_generic_sheet(writer, fundamental_df, "Temel Analiz", FUNDAMENTAL_COLUMNS, FUNDAMENTAL_LABELS)
 
         # --- Gelişmiş göstergeler (Fibonacci, destek/direnç, hacim profili) ---

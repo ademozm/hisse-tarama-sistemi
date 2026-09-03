@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 COLOR_BUY = "#16a34a"
 COLOR_SELL = "#dc2626"
 COLOR_NEUTRAL = "#6b7280"
-MARKET_COLORS = {"us": "#2563eb", "bist": "#dc2626", "crypto": "#f59e0b", "gold": "#eab308"}
+MARKET_COLORS = {"us": "#2563eb", "bist": "#dc2626", "crypto": "#f59e0b", "emtia": "#eab308", "forex": "#8b5cf6"}
 
 
 def market_breakdown_pie(df: pd.DataFrame, market_col: str = "Piyasa") -> go.Figure:
