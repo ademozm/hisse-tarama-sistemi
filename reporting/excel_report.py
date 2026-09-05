@@ -166,6 +166,8 @@ def build_report(
     calendar_df: pd.DataFrame | None = None,
     grid_plan_df: pd.DataFrame | None = None,
     dca_plan_df: pd.DataFrame | None = None,
+    full_status_df: pd.DataFrame | None = None,
+    grid_dca_performance: dict | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -176,6 +178,43 @@ def build_report(
         else:
             summary = scored_df
         _write_generic_sheet(writer, summary, "Özet", DISPLAY_COLUMNS, COLUMN_LABELS, score_col="composite_score")
+
+        # --- Tüm Sembol Durumu: sinyal üretmeyenler DAHİL, taranan her sembolün
+        # şeffaf durumu. "Piyasa boş/az görünüyor" kafa karışıklığını önlemek için. ---
+        if full_status_df is not None and not full_status_df.empty:
+            status_cols = ["symbol", "name", "market", "regime", "close", "adx", "rsi", "sinyal_var_mi", "neden"]
+            status_labels = {
+                "symbol": "Sembol", "name": "Şirket/Varlık", "market": "Piyasa",
+                "regime": "Rejim", "close": "Kapanış", "adx": "ADX", "rsi": "RSI",
+                "sinyal_var_mi": "Sinyal Var mı", "neden": "Neden",
+            }
+            status_display = full_status_df[[c for c in status_cols if c in full_status_df.columns]].copy()
+            status_display["sinyal_var_mi"] = status_display["sinyal_var_mi"].map({True: "Evet", False: "Hayır"})
+            status_display = status_display.rename(columns=status_labels)
+            status_display.to_excel(writer, sheet_name="Tüm Sembol Durumu", index=False)
+            ws = writer.sheets["Tüm Sembol Durumu"]
+            _style_sheet(ws, len(status_display.columns))
+            _autosize(ws, status_display)
+
+            # ÖNEMLİ: Bu özet tablo BİLEREK AYRI bir sayfaya yazılıyor, "Tüm Sembol
+            # Durumu" sayfasının altına DEĞİL. Aynı sayfaya alt alta iki tablo
+            # yazmak Excel'de görsel olarak sorunsuz görünür ama pd.read_excel ile
+            # programatik okunduğunda (örn. Streamlit panelinde) iki tablo birbirine
+            # karışıp veriyi bozar — bu gerçek bir hataydı, testle yakalandı.
+            market_summary = full_status_df.groupby("market").agg(
+                taranan=("symbol", "count"), sinyal_ureten=("sinyal_var_mi", "sum")
+            ).reset_index().rename(columns={"market": "Piyasa", "taranan": "Taranan Sembol",
+                                             "sinyal_ureten": "Sinyal Üreten"})
+            market_summary["Sinyal Üretme Oranı %"] = (
+                market_summary["Sinyal Üreten"] / market_summary["Taranan Sembol"] * 100
+            ).round(1)
+            market_summary.to_excel(writer, sheet_name="Piyasa Özeti", index=False)
+            ws2 = writer.sheets["Piyasa Özeti"]
+            _style_sheet(ws2, len(market_summary.columns))
+            _autosize(ws2, market_summary)
+        else:
+            pd.DataFrame({"Not": ["Bu taramada hiçbir sembol için veri işlenemedi."]}
+                         ).to_excel(writer, sheet_name="Tüm Sembol Durumu", index=False)
 
         # --- Filtrelenmiş sonuçlar ---
         if filtered_df is not None:
@@ -297,6 +336,37 @@ def build_report(
         else:
             pd.DataFrame({"Not": ["Bu taramada AL sinyali üreten sembol bulunamadı, DCA planı oluşturulmadı."]}
                          ).to_excel(writer, sheet_name="DCA Planı", index=False)
+
+        # --- Grid & DCA Performansı (SQLite emir günlüğünden gerçek kazanma oranları) ---
+        grid_perf = (grid_dca_performance or {}).get("grid", {})
+        dca_perf = (grid_dca_performance or {}).get("dca", {})
+
+        grid_perf_rows = [
+            {"Metrik": "Kapanan işlem (al+sat tamamlandı)", "Değer": grid_perf.get("kapanan_islem", 0)},
+            {"Metrik": "Kazanma oranı %", "Değer": grid_perf.get("kazanma_orani_pct") or "Henüz yeterli veri yok"},
+            {"Metrik": "Ortalama kazanç %", "Değer": grid_perf.get("ortalama_kazanc_pct") or "Henüz yeterli veri yok"},
+            {"Metrik": "Bekleyen emir (tetiklenmeyi bekliyor)", "Değer": grid_perf.get("bekleyen", 0)},
+            {"Metrik": "Süresi dolan emir (60+ gün tetiklenmedi)", "Değer": grid_perf.get("suresi_dolan", 0)},
+        ]
+        dca_perf_rows = [
+            {"Metrik": "Gerçekleşen dilim", "Değer": dca_perf.get("gerceklesen_dilim", 0)},
+            {"Metrik": "Bekleyen dilim", "Değer": dca_perf.get("bekleyen_dilim", 0)},
+            {"Metrik": "Ortalama getiri % (güncel fiyata göre)", "Değer": dca_perf.get("ortalama_getiri_pct") or "Henüz yeterli veri yok"},
+            {"Metrik": "Pozitif pozisyon oranı %", "Değer": dca_perf.get("pozitif_pozisyon_orani_pct") or "Henüz yeterli veri yok"},
+        ]
+
+        ws = writer.book.create_sheet("Grid ve DCA Performansı")
+        ws["A1"] = "Grid Stratejisi Performansı (gerçekleşen emirlerden hesaplanır)"
+        ws["A1"].font = Font(bold=True)
+        grid_perf_df = pd.DataFrame(grid_perf_rows)
+        grid_perf_df.to_excel(writer, sheet_name="Grid ve DCA Performansı", index=False, startrow=1)
+
+        dca_start_row = len(grid_perf_rows) + 4
+        ws[f"A{dca_start_row}"] = "DCA Stratejisi Performansı (gerçekleşen dilimlerden hesaplanır)"
+        ws[f"A{dca_start_row}"].font = Font(bold=True)
+        dca_perf_df = pd.DataFrame(dca_perf_rows)
+        dca_perf_df.to_excel(writer, sheet_name="Grid ve DCA Performansı", index=False, startrow=dca_start_row)
+        _autosize(ws, pd.concat([grid_perf_df, dca_perf_df], ignore_index=True))
 
         # --- Filtre özeti ---
         if filter_stats:

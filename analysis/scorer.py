@@ -55,6 +55,53 @@ def _percentile(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
     return pct if higher_is_better else 1 - pct
 
 
+def full_universe_status(signals_by_symbol: dict, universe_df: pd.DataFrame, adx_threshold: float = 22.0) -> pd.DataFrame:
+    """
+    score_universe() SADECE sinyal üreten sembolleri (signal != 0) döner —
+    bu bilinçli bir tasarımdır (rapor kalabalıklaşmasın diye). Ama bu,
+    "emtia/kripto sayfası boş/az görünüyor" gibi kafa karışıklığına yol
+    açabilir: aslında TÜM semboller tarandı, sadece o gün çoğu net bir
+    AL/SAT eşiğini geçmedi.
+
+    Bu fonksiyon, TARANAN HER SEMBOLÜN durumunu (sinyal olsun olmasın)
+    döner — şeffaflık için. "Neden sinyal yok" sorusuna da kaba bir
+    açıklama üretir.
+    """
+    rows = []
+    for symbol, df in signals_by_symbol.items():
+        try:
+            last = df.iloc[-1]
+        except Exception:
+            continue
+
+        signal = int(last.get("signal", 0))
+        regime = last.get("regime", "?")
+        adx = last.get("adx", np.nan)
+        rsi = last.get("rsi", np.nan)
+
+        if signal != 0:
+            neden = "Sinyal üretti"
+        elif regime == "trend" and pd.notna(adx) and adx <= adx_threshold:
+            neden = f"Trend zayıf (ADX {adx:.1f} ≤ eşik {adx_threshold:.0f})"
+        elif regime == "range" and pd.notna(rsi) and 30 < rsi < 70:
+            neden = f"RSI nötr bölgede ({rsi:.1f}, aşırı alım/satım yok)"
+        else:
+            neden = "Net bir eşiği geçmedi"
+
+        rows.append({
+            "symbol": symbol, "regime": regime, "signal": signal,
+            "close": last.get("Close"), "adx": adx, "rsi": rsi,
+            "sinyal_var_mi": signal != 0, "neden": neden,
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(rows)
+    result = result.merge(universe_df[["symbol", "market", "name"]], on="symbol", how="left")
+    return result.sort_values(["market", "sinyal_var_mi"], ascending=[True, False]).reset_index(drop=True)
+
+
 def score_universe(
     signals_by_symbol: dict,
     universe_df: pd.DataFrame,

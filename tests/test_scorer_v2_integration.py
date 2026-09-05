@@ -115,3 +115,31 @@ def test_all_components_together_end_to_end():
         assert result["composite_score"].between(-1.5, 1.5).all()
         for col in ["fundamental_score", "relative_strength_pct", "volatility_annualized_pct", "beta"]:
             assert col in result.columns
+
+
+def test_full_universe_status_includes_all_symbols_regardless_of_signal():
+    symbols = ["A", "B", "C"]
+    signals = _base_signals(symbols)
+    # A ve B'nin sinyalini bilerek sıfırlayalım (bazı semboller sinyal üretmesin diye)
+    signals["A"].iloc[-1, signals["A"].columns.get_loc("signal")] = 0
+    signals["B"].iloc[-1, signals["B"].columns.get_loc("signal")] = 0
+    universe_df = make_universe_df(symbols)
+
+    result = scorer.full_universe_status(signals, universe_df)
+    assert len(result) == 3
+    assert set(result["symbol"]) == {"A", "B", "C"}
+    assert (result[result["symbol"].isin(["A", "B"])]["sinyal_var_mi"] == False).all()
+
+
+def test_full_universe_status_empty_input_returns_empty_df():
+    result = scorer.full_universe_status({}, make_universe_df([]))
+    assert result.empty
+
+
+def test_full_universe_status_has_reason_column():
+    symbols = ["A"]
+    signals = _base_signals(symbols)
+    universe_df = make_universe_df(symbols)
+    result = scorer.full_universe_status(signals, universe_df)
+    assert "neden" in result.columns
+    assert result.iloc[0]["neden"] != ""

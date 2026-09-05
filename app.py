@@ -1,14 +1,13 @@
 """
-Hisse/Kripto Tarama Sistemi - Görsel Tarayıcı Panel
+Hisse/Kripto/Emtia/Döviz Tarama Sistemi — Ana Sayfa
+
+Çok sayfalı panel: bu dosya "Ana Sayfa" (tarama başlatma + genel bakış).
+Diğer bölümler pages/ klasöründe, Streamlit bunları otomatik olarak sol
+menüde ayrı sayfalar halinde listeler — gerçek bir site gibi gezinilir.
 
 Çalıştırma:
     streamlit run app.py
-
-Grafikler için: reporting/dashboard_charts.py (Streamlit'ten bağımsız,
-pytest ile test edilen saf fonksiyonlar). Bu dosya sadece arayüz/etkileşim
-kodudur.
 """
-import ast
 import logging
 import os
 import sys
@@ -22,40 +21,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
 from main_scan import run_scan
-from data_pipeline import cache
-from analysis import indicators
 from reporting import dashboard_charts as charts
+import dashboard_common as dc
 
 st.set_page_config(page_title="Hisse & Kripto Tarama Sistemi", layout="wide", page_icon="📈")
-
-# ============ ÖZEL CSS: kart görünümü, renkler, boşluklar ============
-st.markdown("""
-<style>
-    .block-container { padding-top: 1.5rem; max-width: 1400px; }
-    div[data-testid="stMetric"] {
-        background: rgba(120,120,120,0.06);
-        border: 1px solid rgba(120,120,120,0.15);
-        border-radius: 10px;
-        padding: 12px 16px;
-    }
-    .kpi-good { color: #16a34a !important; }
-    .kpi-bad { color: #dc2626 !important; }
-    .news-card {
-        border: 1px solid rgba(120,120,120,0.15);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 8px;
-    }
-    .event-card {
-        border-left: 4px solid #f59e0b;
-        background: rgba(245,158,11,0.08);
-        border-radius: 6px;
-        padding: 10px 14px;
-        margin-bottom: 8px;
-    }
-    h1, h2, h3 { letter-spacing: -0.3px; }
-</style>
-""", unsafe_allow_html=True)
+dc.inject_css()
 
 
 class StreamlitLogHandler(logging.Handler):
@@ -69,23 +39,25 @@ class StreamlitLogHandler(logging.Handler):
         self.container.code("\n".join(self.lines[-25:]), language=None)
 
 
-def _parse_list_cell(value):
-    """Excel'e yazılırken string'e dönüşen Python listelerini ([1.2, 3.4] gibi) geri çevirir."""
-    if isinstance(value, list):
-        return value
-    if not isinstance(value, str) or not value.strip().startswith("["):
-        return []
-    try:
-        return [float(x) for x in ast.literal_eval(value)]
-    except Exception:
-        return []
-
-
 st.title("📈 Hisse & Kripto Tarama Sistemi")
 st.caption("Teknik + temel analiz + göreceli güç + risk + haber + grid/DCA — birleşik skorlama, çok kaynaklı doğrulama")
 
 # ============ SOL PANEL: AYARLAR ============
 with st.sidebar:
+    st.header("🧭 Gezinme")
+    st.page_link("app.py", label="Ana Sayfa", icon="🏠")
+    st.page_link("pages/1_Grafik_Inceleme.py", label="Grafik İnceleme", icon="📈")
+    st.page_link("pages/2_Piyasalar.py", label="Piyasalar", icon="💼")
+    st.page_link("pages/3_Tum_Semboller.py", label="Tüm Sembol Durumu", icon="📋")
+    st.page_link("pages/4_Temel_Risk_Gelismis.py", label="Temel & Risk & Gelişmiş", icon="🔬")
+    st.page_link("pages/5_Grid_DCA.py", label="Grid & DCA", icon="🎯")
+    st.page_link("pages/5b_Grid_DCA_Performans.py", label="Grid & DCA Performansı", icon="📊")
+    st.page_link("pages/6_Haberler.py", label="Haberler", icon="📰")
+    st.page_link("pages/7_Takvim.py", label="Ekonomik Takvim", icon="📅")
+    st.page_link("pages/8_Performans.py", label="Geçmiş Performans", icon="📜")
+    st.page_link("pages/9_Hatalar.py", label="Hata Raporu", icon="⚠️")
+
+    st.divider()
     st.header("Tarama Ayarları")
 
     markets_labels = {"ABD Hisseleri (S&P 100)": "us", "BIST": "bist", "Kripto Paralar": "crypto",
@@ -122,23 +94,8 @@ with st.sidebar:
     run_clicked = st.button("🔍 Taramayı Başlat", type="primary", use_container_width=True)
 
 
-def _find_latest_report() -> str | None:
-    """reports/ klasöründeki en son (dosya adına göre en yeni) Excel raporunu bulur.
-    GitHub Actions gibi otomatik taramalar sonucu oluşan raporu, panel
-    açılır açılmaz göstermek için kullanılır."""
-    if not os.path.isdir(config.REPORTS_DIR):
-        return None
-    xlsx_files = [f for f in os.listdir(config.REPORTS_DIR) if f.endswith(".xlsx") and f.startswith("tarama_")]
-    if not xlsx_files:
-        return None
-    xlsx_files.sort(reverse=True)  # dosya adı YYYYMMDD_HHMMSS içerdiği için alfabetik = kronolojik
-    return os.path.join(config.REPORTS_DIR, xlsx_files[0])
-
-
 if "last_report_path" not in st.session_state:
-    # Panel ilk açıldığında (örn. Telegram linkinden), elle tarama yapmadan
-    # önce otomatik taramanın (GitHub Actions) en son ürettiği raporu göster
-    st.session_state.last_report_path = _find_latest_report()
+    st.session_state.last_report_path = dc.find_latest_report()
 
 if run_clicked:
     if not selected_markets:
@@ -175,6 +132,7 @@ if run_clicked:
             account_size=account_size, risk_per_trade_pct=risk_pct,
         )
         st.session_state.last_report_path = output_path
+        dc.load_sheets.clear()  # önbelleği temizle, yeni raporu okusun
         st.success(f"✅ Tarama tamamlandı! ({time.time() - start:.0f} saniye)")
     except Exception as e:
         st.error(f"Tarama sırasında hata oluştu: {e}")
@@ -183,18 +141,18 @@ if run_clicked:
         root_logger.removeHandler(handler)
 
 
-# ============ SONUÇLARI GÖSTER ============
-if st.session_state.last_report_path and os.path.exists(st.session_state.last_report_path):
-    path = st.session_state.last_report_path
-    sheets = pd.read_excel(path, sheet_name=None)
-    ozet = sheets.get("Özet", pd.DataFrame())
+# ============ GENEL BAKIŞ ============
+path, sheets = dc.get_current_sheets()
 
-    report_time = os.path.getmtime(path)
-    report_dt = pd.Timestamp.fromtimestamp(report_time)
+if path:
+    ozet = sheets.get("Özet", pd.DataFrame())
+    full_status = sheets.get("Tüm Sembol Durumu", pd.DataFrame())
+
+    report_dt = pd.Timestamp.fromtimestamp(os.path.getmtime(path))
     if not run_clicked:
-        st.caption(f"📄 Otomatik bulunan en son rapor gösteriliyor — {report_dt.strftime('%d.%m.%Y %H:%M')} "
-                   f"tarihli (muhtemelen otomatik/bulut taramasından). Kendi kriterlerinle yeni bir tarama "
-                   f"için soldan ayarları seçip 'Taramayı Başlat'a bas.")
+        st.caption(f"📄 En son rapor gösteriliyor — {report_dt.strftime('%d.%m.%Y %H:%M')} tarihli "
+                   f"(otomatik/bulut taramasından olabilir). Yeni tarama için soldan ayarları seçip "
+                   f"'Taramayı Başlat'a bas.")
 
     st.divider()
     with open(path, "rb") as f:
@@ -202,183 +160,47 @@ if st.session_state.last_report_path and os.path.exists(st.session_state.last_re
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # ---- KPI kartları ----
+    total_scanned = len(full_status) if not full_status.empty else len(ozet)
     if not ozet.empty:
         al_count = (ozet["Sinyal"] == "AL").sum()
         sat_count = (ozet["Sinyal"] == "SAT").sum()
         avg_score = ozet["Skor"].abs().mean()
-        supheli_count = (ozet.get("Veri Şüpheli mi", pd.Series(dtype=str)) == "Evet").sum()
-        takvim_df = sheets.get("Ekonomik Takvim", pd.DataFrame())
-        yaklasan_olay = len(takvim_df) if "Tarih" in takvim_df.columns else 0
+    else:
+        al_count = sat_count = avg_score = 0
+    supheli_count = (ozet.get("Veri Şüpheli mi", pd.Series(dtype=str)) == "Evet").sum() if not ozet.empty else 0
+    takvim_df = sheets.get("Ekonomik Takvim", pd.DataFrame())
+    yaklasan_olay = len(takvim_df) if "Tarih" in takvim_df.columns else 0
 
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Toplam Sinyal", len(ozet))
-        c2.metric("AL Sinyali", al_count)
-        c3.metric("SAT Sinyali", sat_count)
-        c4.metric("Ort. |Skor|", f"{avg_score:.2f}")
-        c5.metric("Yaklaşan Önemli Olay", yaklasan_olay, delta="⚠️" if yaklasan_olay > 0 else None)
-        if supheli_count > 0:
-            st.warning(f"⚠️ {supheli_count} sembolde yfinance/Stooq veri uyuşmazlığı tespit edildi — 'Piyasalar' sekmesinde 'Veri Şüpheli mi' sütununa bak.")
+    c0, c1, c2, c3, c4, c5 = st.columns(6)
+    c0.metric("Taranan Sembol", total_scanned)
+    c1.metric("Sinyal Üreten", len(ozet))
+    c2.metric("AL", al_count)
+    c3.metric("SAT", sat_count)
+    c4.metric("Ort. |Skor|", f"{avg_score:.2f}" if avg_score else "-")
+    c5.metric("Yaklaşan Olay", yaklasan_olay, delta="⚠️" if yaklasan_olay > 0 else None)
+
+    if supheli_count > 0:
+        st.warning(f"⚠️ {supheli_count} sembolde yfinance/Stooq veri uyuşmazlığı — 'Piyasalar' sayfasına bak.")
+    if total_scanned and len(ozet) < total_scanned * 0.15:
+        st.info(f"ℹ️ {total_scanned} sembol tarandı, sadece {len(ozet)} tanesi net bir AL/SAT sinyali üretti — "
+                f"bu normaldir (piyasa sakin olabilir). Taranan HER sembolün durumunu görmek için "
+                f"soldaki **'Tüm Sembol Durumu'** sayfasına bak.")
 
     st.divider()
+    st.subheader("📊 Genel Bakış")
+    if ozet.empty:
+        st.info("Bu taramada sinyal üreten sembol bulunamadı — 'Tüm Sembol Durumu' sayfasından tarananların "
+                "tam listesini görebilirsin.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(charts.market_breakdown_pie(ozet), use_container_width=True)
+        with col2:
+            st.plotly_chart(charts.score_histogram(ozet), use_container_width=True)
+        st.plotly_chart(charts.top_signals_bar(ozet, n=10), use_container_width=True)
 
-    tab_names = ["📊 Genel Bakış", "📈 Grafik İnceleme", "💼 Piyasalar", "🔬 Temel & Risk & Gelişmiş",
-                 "🎯 Grid & DCA", "📰 Haberler", "📅 Ekonomik Takvim", "📜 Geçmiş Performans", "⚠️ Hata Raporu"]
-    tabs = st.tabs(tab_names)
-
-    # ---- 1) Genel Bakış ----
-    with tabs[0]:
-        if ozet.empty:
-            st.info("Bu taramada sinyal üreten sembol bulunamadı.")
-        else:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(charts.market_breakdown_pie(ozet), use_container_width=True)
-            with col2:
-                st.plotly_chart(charts.score_histogram(ozet), use_container_width=True)
-            st.plotly_chart(charts.top_signals_bar(ozet, n=10), use_container_width=True)
-
-    # ---- 2) Grafik İnceleme (candlestick + EMA + destek/direnç) ----
-    with tabs[1]:
-        gelismis = sheets.get("Gelişmiş Göstergeler", pd.DataFrame())
-        if ozet.empty:
-            st.info("Grafik için önce bir tarama yapmalısın.")
-        else:
-            symbol_options = ozet["Sembol"].tolist()
-            selected_symbol = st.selectbox("Sembol seç", symbol_options)
-
-            ohlc = cache.get_cached(selected_symbol, config.FETCH_INTERVAL, ttl_minutes=999999)
-            if ohlc is None:
-                st.warning("Bu sembol için önbellekte fiyat verisi bulunamadı (cache temizlenmiş olabilir).")
-            else:
-                ema_fast = indicators.ema(ohlc["Close"], 12)
-                ema_slow = indicators.ema(ohlc["Close"], 26)
-
-                support_levels, resistance_levels = [], []
-                if not gelismis.empty and "Sembol" in gelismis.columns:
-                    row = gelismis[gelismis["Sembol"] == selected_symbol]
-                    if not row.empty:
-                        support_levels = _parse_list_cell(row.iloc[0].get("Destek Seviyeleri"))
-                        resistance_levels = _parse_list_cell(row.iloc[0].get("Direnç Seviyeleri"))
-
-                fig = charts.candlestick_chart(
-                    ohlc.tail(150), ema_fast=ema_fast.tail(150), ema_slow=ema_slow.tail(150),
-                    support_levels=support_levels, resistance_levels=resistance_levels,
-                    title=f"{selected_symbol} — Fiyat + EMA(12/26) + Destek/Direnç",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                st.plotly_chart(charts.volume_bar(ohlc.tail(150)), use_container_width=True)
-
-                sym_row = ozet[ozet["Sembol"] == selected_symbol]
-                if not sym_row.empty:
-                    r = sym_row.iloc[0]
-                    mc1, mc2, mc3, mc4 = st.columns(4)
-                    mc1.metric("Sinyal", r.get("Sinyal", "-"))
-                    mc2.metric("Skor", f"{r.get('Skor', 0):.3f}")
-                    mc3.metric("RSI", f"{r.get('RSI', 0):.1f}" if pd.notna(r.get("RSI")) else "-")
-                    mc4.metric("ADX", f"{r.get('ADX', 0):.1f}" if pd.notna(r.get("ADX")) else "-")
-
-    # ---- 3) Piyasalar (ABD/BIST/Kripto/Emtia/Döviz tabloları) ----
-    with tabs[2]:
-        market_tab_names = [n for n in ["ABD", "BIST", "Kripto", "Emtialar", "Döviz"] if n in sheets]
-        if market_tab_names:
-            market_tabs = st.tabs(market_tab_names)
-            for mtab, mname in zip(market_tabs, market_tab_names):
-                with mtab:
-                    df = sheets[mname]
-                    if df.empty:
-                        st.write("Bu piyasada sinyal bulunamadı.")
-                    elif "Skor" in df.columns:
-                        st.dataframe(df.style.background_gradient(subset=["Skor"], cmap="RdYlGn", vmin=-1, vmax=1),
-                                     use_container_width=True, height=500)
-                    else:
-                        st.dataframe(df, use_container_width=True, height=500)
-
-    # ---- 4) Temel & Risk & Gelişmiş Göstergeler ----
-    with tabs[3]:
-        for sheet_name in ["Temel Analiz", "Risk Metrikleri", "Gelişmiş Göstergeler"]:
-            df = sheets.get(sheet_name, pd.DataFrame())
-            st.subheader(sheet_name)
-            if df.empty:
-                st.write("Veri yok.")
-            else:
-                st.dataframe(df, use_container_width=True, height=350)
-            st.divider()
-
-    # ---- 5) Grid & DCA ----
-    with tabs[4]:
-        grid_df = sheets.get("Grid Planı", pd.DataFrame())
-        dca_df = sheets.get("DCA Planı", pd.DataFrame())
-
-        st.subheader("Grid Planı (yatay/range piyasalar için)")
-        if grid_df.empty or "Sembol" not in grid_df.columns:
-            st.info("Bu taramada grid stratejisine uygun (range rejiminde) sembol bulunamadı.")
-        else:
-            grid_symbols = grid_df["Sembol"].unique().tolist()
-            sel_grid_symbol = st.selectbox("Sembol seç", grid_symbols, key="grid_symbol")
-            st.plotly_chart(charts.grid_ladder_chart(grid_df[grid_df["Sembol"] == sel_grid_symbol]),
-                             use_container_width=True)
-            st.dataframe(grid_df[grid_df["Sembol"] == sel_grid_symbol], use_container_width=True)
-
-        st.divider()
-        st.subheader("DCA (Kademeli Alım) Planı")
-        if dca_df.empty or "Sembol" not in dca_df.columns:
-            st.info("Bu taramada AL sinyali üreten sembol bulunamadı.")
-        else:
-            dca_symbols = dca_df["Sembol"].unique().tolist()
-            sel_dca_symbol = st.selectbox("Sembol seç", dca_symbols, key="dca_symbol")
-            st.plotly_chart(charts.dca_steps_chart(dca_df[dca_df["Sembol"] == sel_dca_symbol]),
-                             use_container_width=True)
-            st.dataframe(dca_df[dca_df["Sembol"] == sel_dca_symbol], use_container_width=True)
-
-    # ---- 6) Haberler ----
-    with tabs[5]:
-        haberler = sheets.get("Haberler", pd.DataFrame())
-        if haberler.empty:
-            st.info("Bu taramada haber verisi bulunamadı.")
-        else:
-            for _, row in haberler.iterrows():
-                sentiment = row.get("Haber Tonu", 0)
-                sentiment = 0 if pd.isna(sentiment) else sentiment
-                renk = "#16a34a" if sentiment > 0.1 else ("#dc2626" if sentiment < -0.1 else "#6b7280")
-                sembol_etiketi = f"<b>{row.get('Sembol', '')}</b> — " if row.get("Sembol") else ""
-                st.markdown(f"""
-                <div class="news-card">
-                    <span style="color:{renk}; font-weight:600;">●</span>
-                    {sembol_etiketi}{row.get('Başlık', '')}
-                    <br><span style="color:#888; font-size:0.85em;">{row.get('Kaynak', '')} · {row.get('Yayıncı', '')}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            st.caption("Haber tonu basit anahtar-kelime sayımıdır, gerçek NLP değildir — kaba bir gösterge olarak değerlendirin.")
-
-    # ---- 7) Ekonomik Takvim ----
-    with tabs[6]:
-        takvim = sheets.get("Ekonomik Takvim", pd.DataFrame())
-        if takvim.empty or "Tarih" not in takvim.columns:
-            st.info("Önümüzdeki 14 gün içinde bilinen önemli bir ekonomik olay yok.")
-        else:
-            for _, row in takvim.sort_values("Kalan Gün").iterrows():
-                st.markdown(f"""
-                <div class="event-card">
-                    <b>{row['Tarih']}</b> ({int(row['Kalan Gün'])} gün kaldı) — {row['Olay']}
-                    <br><span style="color:#888; font-size:0.85em;">Önem: {row['Önem']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-
-    # ---- 8) Geçmiş Performans ----
-    with tabs[7]:
-        perf = sheets.get("Performans Geçmişi", pd.DataFrame())
-        if perf.empty:
-            st.info("Henüz yeterli sinyal geçmişi yok — sistem birkaç tarama sonra performans istatistiği üretmeye başlar.")
-        else:
-            st.dataframe(perf, use_container_width=True)
-
-    # ---- 9) Hata Raporu ----
-    with tabs[8]:
-        hata = sheets.get("Hata Raporu", pd.DataFrame())
-        if hata.empty or "Sembol" not in hata.columns:
-            st.success("Bu taramada hata/geçersiz veri yok.")
-        else:
-            st.dataframe(hata, use_container_width=True)
+    st.divider()
+    st.markdown("👈 Detaylı analiz için soldaki menüden bir sayfa seç.")
 
 else:
     st.info("Soldaki ayarları seç ve **'Taramayı Başlat'** butonuna bas.")
@@ -387,5 +209,6 @@ else:
     1. Soldan taramak istediğin piyasaları seç (ABD / BIST / Kripto / Emtia / Döviz)
     2. Hızlı bir deneme için "Temel analizi atla" kutucuğunu işaretle
     3. "Taramayı Başlat" butonuna bas
-    4. Birkaç dakika sonra: KPI kartları, grafikler ve sekmeli detaylı sonuçlar burada görünecek
+    4. Birkaç dakika sonra: KPI kartları, genel bakış grafikleri burada; detaylı analiz sol menüdeki
+       sayfalarda (Grafik İnceleme, Piyasalar, Grid & DCA, Haberler...) görünecek
     """)

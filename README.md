@@ -210,6 +210,80 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
+## 🆕 v10 — Çok Sayfalı Site, Tam Şeffaflık, Grid/DCA Emir Takibi
+
+### "Emtia boş görünüyor" sorunu çözüldü — ama farklı bir sebeple
+
+Teşhis: sistem daha önce sadece **sinyal üreten** sembolleri piyasa
+sayfalarında gösteriyordu. Emtia'daki 4 sembolün (ya da kriptodaki 15
+sembolün) çoğu o gün net bir AL/SAT eşiğini geçmediyse, sayfa "boş"
+görünüyordu — bu bir veri hatası değil, sistemin varsayılan davranışıydı.
+
+**Çözüm — yeni "Tüm Sembol Durumu" sayfası:** Artık taranan **HER**
+sembolün (sinyal üretsin üretmesin) rejimi, ADX/RSI değeri ve "neden
+sinyal yok" açıklaması ayrı bir sayfada gösteriliyor. Ayrıca yeni bir
+**"Piyasa Özeti"** sayfası, her piyasada kaç sembol tarandığını ve
+kaçının sinyal ürettiğini (`emtia: 4 tarandı, 0 sinyal üretti` gibi)
+net olarak gösteriyor.
+
+### Site tasarımı: gerçek çok sayfalı yapı
+
+Streamlit artık tek sayfa sekmeli yapıdan, **her biri kendi URL'i olan,
+sol menüden gezinilen 10 ayrı sayfaya** dönüştürüldü — tarayıcıdan
+gerçek bir site gibi kullanılıyor:
+
+```
+app.py (Ana Sayfa)          → tarama başlatma + genel bakış + KPI kartları
+pages/1_Grafik_Inceleme.py  → interaktif mum grafiği
+pages/2_Piyasalar.py        → piyasa bazlı tablolar
+pages/3_Tum_Semboller.py    → YENİ: taranan her sembolün durumu
+pages/4_Temel_Risk_Gelismis.py
+pages/5_Grid_DCA.py         + pages/5b_Grid_DCA_Performans.py → YENİ
+pages/6_Haberler.py
+pages/7_Takvim.py
+pages/8_Performans.py
+pages/9_Hatalar.py
+```
+
+Ortak kod (`dashboard_common.py`) tüm sayfalarda paylaşılıyor — CSS,
+rapor önbellekleme (`st.cache_data`), en son raporu otomatik bulma.
+
+### Grid & DCA emir takibi ve ayrı kazanç oranı hesaplama
+
+`analysis/grid_dca_journal.py` (yeni, SQLite tabanlı): her grid
+seviyesi/DCA dilimi bir "emir" olarak kaydediliyor, sonraki taramalarda
+gerçek fiyat verisiyle karşılaştırılıp:
+
+- **Grid**: fiyat "al" seviyesine değdi mi → "al gerçekleşti"; sonra
+  "sat" seviyesine ulaştı mı → "sat gerçekleşti, kazanç X%" (60 gün
+  içinde hiç tetiklenmezse "süresi doldu")
+- **DCA**: fiyat tetik seviyesine değdi mi → "gerçekleşti"; performans,
+  gerçekleşen dilimlerin ortalama maliyeti ile güncel fiyat
+  karşılaştırılarak (gerçekleşmemiş kâr/zarar) hesaplanıyor
+
+Kazanma oranları **grid ve DCA için ayrı ayrı** hesaplanıp yeni "Grid ve
+DCA Performansı" sayfasında gösteriliyor.
+
+**ÖNEMLİ:** Bu gerçek bir emir sistemi DEĞİLDİR, hiçbir borsaya
+bağlanmaz — "eğer bu seviyeler önerildiğinde gerçekten işlem yapılsaydı
+ne olurdu" sorusuna geçmişe dönük fiyat verisiyle cevap arayan bir
+SİMÜLASYON/TAKİP sistemidir.
+
+### Bu turda bulunan iki gerçek hata daha
+
+1. **Grid emir süre-dolumu hatası:** Süre kontrolü fiyat kontrolünden
+   ÖNCE çalışıyordu — uzun süredir güncellenmemiş bir emir, fiyata hiç
+   bakılmadan yanlışlıkla "süresi doldu" işaretleniyordu. Sıralama
+   düzeltildi (önce her zaman fiyat kontrolü yapılıyor).
+2. **Excel'de iki tabloyu aynı sayfaya alt alta yazma hatası:** "Tüm
+   Sembol Durumu" sayfasına ana tablo + özet tablo alt alta yazılıyordu.
+   Excel'de görsel olarak sorunsuz görünüyordu ama `pd.read_excel` ile
+   programatik okunduğunda (Streamlit panelinde) iki tablo birbirine
+   karışıp veri bozuluyordu. Özet artık ayrı bir sayfada ("Piyasa Özeti").
+
+Her iki hata da, bu turda eklenen testler sayesinde (körü körüne değil)
+gerçek veriyle çalıştırılarak yakalandı.
+
 ## 🆕 v9 — Genişletilmiş Kapsam (Emtia, Döviz) ve Kritik Veri Hatası Düzeltmesi
 
 ### Altın hatasının kök sebebi bulundu ve düzeltildi
@@ -668,6 +742,9 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Görsel panel: grafikler, KPI kartları, sekmeli detaylı tasarım~~ ✅ tamamlandı
 - ~~Genişletilmiş piyasa kapsamı (Emtia, Döviz) + kritik veri hatası düzeltmesi~~ ✅ tamamlandı
 - ~~Telegram bildirimine panel linki~~ ✅ tamamlandı (Streamlit Cloud deploy gerektirir)
+- ~~Çok sayfalı site tasarımı~~ ✅ tamamlandı
+- ~~Tüm sembol durumu şeffaflığı (sinyal üretmeyenler dahil)~~ ✅ tamamlandı
+- ~~Grid & DCA emir takibi + ayrı kazanma oranı hesaplama~~ ✅ tamamlandı
 - ~~Walk-forward parametre optimizasyonu scripti~~ ✅ tamamlandı (`run_walk_forward.py`)
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)

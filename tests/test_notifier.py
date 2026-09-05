@@ -92,3 +92,28 @@ def test_notify_scan_complete_sends_message_and_file(monkeypatch, tmp_path):
         result = notifier.notify_scan_complete(_scored_df(), {"başlangıç": 10, "son": 5}, str(fake_file))
         assert result is True
         assert mock_post.call_count == 2  # bir mesaj + bir dosya
+
+
+def test_build_summary_message_includes_panel_link_when_configured(monkeypatch):
+    monkeypatch.setenv("STREAMLIT_APP_URL", "https://ornek-panel.streamlit.app")
+    df = pd.DataFrame({
+        "symbol": ["AAPL"], "market": ["us"], "signal": [1], "composite_score": [0.5],
+    })
+    msg = notifier.build_summary_message(df)
+    assert "https://ornek-panel.streamlit.app" in msg
+    assert "Paneli" in msg or "panelde" in msg
+
+
+def test_build_summary_message_no_link_when_not_configured(monkeypatch):
+    monkeypatch.delenv("STREAMLIT_APP_URL", raising=False)
+    df = pd.DataFrame({
+        "symbol": ["AAPL"], "market": ["us"], "signal": [1], "composite_score": [0.5],
+    })
+    msg = notifier.build_summary_message(df)
+    assert "streamlit.app" not in msg
+
+
+def test_build_summary_message_empty_df_includes_link_when_configured(monkeypatch):
+    monkeypatch.setenv("STREAMLIT_APP_URL", "https://ornek-panel.streamlit.app")
+    msg = notifier.build_summary_message(pd.DataFrame())
+    assert "https://ornek-panel.streamlit.app" in msg

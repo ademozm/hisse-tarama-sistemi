@@ -30,7 +30,7 @@ from analysis.strategy import RegimeAdaptiveStrategy
 from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
-    position_sizing, economic_calendar, grid_strategy, dca_plan,
+    position_sizing, economic_calendar, grid_strategy, dca_plan, grid_dca_journal,
 )
 from reporting import excel_report
 
@@ -185,7 +185,10 @@ def run_scan(
         risk_metrics_by_symbol=risk_by_symbol,
         news_by_symbol=news_by_symbol,
     )
-    logger.info(f"Sinyal üreten sembol sayısı: {len(scored_df)}")
+    logger.info(f"Sinyal üreten sembol sayısı: {len(scored_df)} / {len(signals_by_symbol)} taranan")
+
+    # Şeffaflık için: sinyal üretsin üretmesin, TÜM taranan sembollerin durumu
+    full_status_df = scorer.full_universe_status(signals_by_symbol, universe_df)
 
     # Gelişmiş göstergeleri skorlanmış tabloya ekle (rapora yansısın diye)
     if not scored_df.empty and advanced_by_symbol:
@@ -252,6 +255,21 @@ def run_scan(
     logger.info(f"Grid planı: {grid_plan_df['symbol'].nunique() if not grid_plan_df.empty else 0} sembol, "
                 f"DCA planı: {dca_plan_df['symbol'].nunique() if not dca_plan_df.empty else 0} sembol")
 
+    # --- 9.9) Grid/DCA emir günlüğü: yeni planları kaydet, eski emirlerin sonucunu güncelle ---
+    grid_perf, dca_perf = {}, {}
+    if update_journal:
+        try:
+            grid_dca_journal.record_grid_plan(grid_plan_df, universe_df, scan_time=start_time.isoformat())
+            grid_dca_journal.record_dca_plan(dca_plan_df, universe_df, scan_time=start_time.isoformat())
+            grid_outcome_stats = grid_dca_journal.update_grid_outcomes(valid_data)
+            dca_outcome_stats = grid_dca_journal.update_dca_outcomes(valid_data)
+            logger.info(f"Grid emir güncellemesi: {grid_outcome_stats}")
+            logger.info(f"DCA emir güncellemesi: {dca_outcome_stats}")
+            grid_perf = grid_dca_journal.compute_grid_performance()
+            dca_perf = grid_dca_journal.compute_dca_performance(current_data_by_symbol=valid_data)
+        except Exception as e:
+            logger.warning(f"Grid/DCA emir günlüğü güncellenemedi: {e}")
+
     # --- 10) Filtreleme ---
     active_filters = dict(config.FILTERS)
     if filter_overrides:
@@ -285,6 +303,8 @@ def run_scan(
         calendar_df=calendar_df,
         grid_plan_df=grid_plan_df,
         dca_plan_df=dca_plan_df,
+        full_status_df=full_status_df,
+        grid_dca_performance={"grid": grid_perf, "dca": dca_perf},
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---

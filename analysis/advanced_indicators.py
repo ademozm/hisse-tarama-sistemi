@@ -10,6 +10,8 @@ ek bilgi olarak eklenirler.
 import numpy as np
 import pandas as pd
 
+from analysis import candlestick_patterns
+
 FIB_RATIOS = [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0]
 
 
@@ -166,6 +168,7 @@ def compute_all(df: pd.DataFrame) -> dict:
     fib_context = nearest_fib_level(close, fib) if fib else {"nearest_fib_level": None, "distance_pct": np.nan}
     sr = support_resistance_levels(df)
     vp = volume_profile(df)
+    pattern = candlestick_patterns.detect_last_pattern(df)
 
     return {
         "fib_trend_direction": fib.get("trend_direction"),
@@ -178,4 +181,6 @@ def compute_all(df: pd.DataFrame) -> dict:
         "poc_price": vp["poc_price"],
         "value_area_low": vp["value_area_low"],
         "value_area_high": vp["value_area_high"],
+        "candlestick_pattern": pattern["pattern"],
+        "candlestick_direction": pattern["pattern_direction"],
     }

@@ -118,3 +118,23 @@ def test_build_report_empty_scored_df_does_not_crash():
     excel_report.build_report(pd.DataFrame(), {}, path)
     assert os.path.exists(path)
     os.remove(path)
+
+
+def test_build_report_includes_grid_dca_performance_sheet():
+    path = "/tmp/test_excel_report_griddca.xlsx"
+    scored_df = pd.DataFrame({
+        "symbol": ["AAPL"], "name": ["Apple"], "market": ["us"], "signal": [1],
+        "regime": ["trend"], "composite_score": [0.6], "close": [150.0],
+    })
+    grid_dca_perf = {
+        "grid": {"kapanan_islem": 5, "kazanma_orani_pct": 80.0, "ortalama_kazanc_pct": 2.5,
+                 "bekleyen": 3, "suresi_dolan": 1},
+        "dca": {"gerceklesen_dilim": 8, "bekleyen_dilim": 2, "ortalama_getiri_pct": 4.2,
+                "pozitif_pozisyon_orani_pct": 75.0},
+    }
+    excel_report.build_report(scored_df, {}, path, grid_dca_performance=grid_dca_perf)
+    sheets = pd.read_excel(path, sheet_name="Grid ve DCA Performansı", header=None)
+    full_text = sheets.to_string()
+    assert "80.0" in full_text or "80" in full_text  # kazanma oranı
+    assert "4.2" in full_text  # DCA ortalama getiri
+    os.remove(path)
