@@ -17,6 +17,7 @@ from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
     position_sizing, economic_calendar, grid_strategy, dca_plan, grid_dca_journal,
+    portfolio_correlation,
 )
 from reporting import excel_report
 
@@ -144,6 +145,7 @@ if not scored_df.empty:
 
 print("[10.5/15] Çapraz doğrulama (Stooq mock) ve pozisyon büyüklüğü test ediliyor...")
 from unittest.mock import patch
+portfolio_summary_stats = {}
 if not scored_df.empty:
     with patch("data_pipeline.stooq_fetcher.fetch_with_fallback", return_value=None):
         cross_val_rows = []
@@ -158,6 +160,19 @@ if not scored_df.empty:
     scored_df = position_sizing.compute_for_scored_df(scored_df, account_size=10000.0, risk_per_trade_pct=1.0)
     assert "onerilen_adet" in scored_df.columns
     print(f"        Pozisyon büyüklüğü önerileri eklendi")
+
+    print("[10.7/15] Portföy korelasyon kontrolü test ediliyor...")
+    portfolio_summary_stats = {}
+    if len(scored_df) >= 2:
+        signal_symbols = scored_df["symbol"].tolist()
+        corr_matrix = portfolio_correlation.compute_correlation_matrix(valid_data, signal_symbols)
+        clusters = portfolio_correlation.find_correlated_clusters(corr_matrix)
+        scored_df = portfolio_correlation.adjust_position_sizes(scored_df, clusters)
+        portfolio_summary_stats = portfolio_correlation.portfolio_summary(scored_df, corr_matrix, clusters)
+        print(f"        {len(clusters)} korelasyonlu küme bulundu: {clusters}")
+        print(f"        Portföy özeti: {portfolio_summary_stats}")
+        assert "korelasyon_kumesi" in scored_df.columns
+        assert "efektif_portfoy_yuzdesi" in scored_df.columns
 
 print("[11/15] Ekonomik takvim test ediliyor...")
 calendar_df = economic_calendar.get_calendar()
@@ -231,7 +246,8 @@ excel_report.build_report(scored_df, validation_report, output_path,
                            performance_stats_df=performance_df, macro_news=macro_news,
                            calendar_df=calendar_df, grid_plan_df=grid_plan_df, dca_plan_df=dca_plan_df,
                            full_status_df=full_status_df,
-                           grid_dca_performance={"grid": grid_perf, "dca": dca_perf})
+                           grid_dca_performance={"grid": grid_perf, "dca": dca_perf},
+                           portfolio_summary_stats=portfolio_summary_stats)
 
 # Telegram yapılandırılmamış olduğu için False dönmeli, hata FIRLATMAMALI
 notified = notifier.notify_scan_complete(filtered_df, filter_stats, output_path)
@@ -245,10 +261,10 @@ for name, sheet in sheets.items():
 
 print("[16/16] Sayfa bütünlüğü doğrulanıyor...")
 expected_sheets = {"Özet", "Filtrelenmiş", "ABD", "BIST", "Kripto", "Emtialar", "Döviz", "Temel Analiz",
-                   "Tüm Sembol Durumu", "Piyasa Özeti", "Grid ve DCA Performansı",
+                   "Tüm Sembol Durumu", "Piyasa Özeti", "Grid ve DCA Performansı", "Portföy Korelasyonu",
                    "Gelişmiş Göstergeler", "Risk Metrikleri", "Performans Geçmişi",
                    "Filtre Özeti", "Hata Raporu", "Haberler", "Ekonomik Takvim",
                    "Grid Planı", "DCA Planı"}
 assert expected_sheets.issubset(set(sheets.keys())), f"Eksik sayfa(lar): {expected_sheets - set(sheets.keys())}"
 
-print("\n✓ TÜM SİSTEM (v10: ÇOK SAYFALI SİTE + TÜM SEMBOL DURUMU + GRID/DCA EMİR TAKİBİ DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")
+print("\n✓ TÜM SİSTEM (v11: PORTFÖY-SEVİYESİ KORELASYON KONTROLÜ DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")

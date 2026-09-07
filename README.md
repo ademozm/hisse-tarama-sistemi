@@ -210,6 +210,53 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
+## 🆕 v11 — Portföy-Seviyesi Korelasyon Kontrolü
+
+### Sorun neydi?
+
+`position_sizing.py`, her sinyali BAĞIMSIZ bir bahis gibi boyutlandırıyordu
+(her biri hesabın %1'ini riske atacak şekilde). Ama aynı anda gelen 5
+sinyal birbirine yüksek korelasyonluysa (örn. hepsi aynı sektör, ya da
+hepsi genel piyasa yönünü takip ediyorsa), bunlar aslında bağımsız değil
+— piyasa ters giderse hepsi aynı anda zarar edebilir. Bu durumda gerçek
+risk, "5 × %1 = %5" değil, korelasyon derecesine göre çok daha yüksek
+olabilir.
+
+### Çözüm
+
+`analysis/portfolio_correlation.py`: sinyal üreten sembollerin son 60
+günlük getirileri arasında korelasyon matrisi hesaplanır. Yüksek
+korelasyonlu (varsayılan eşik: 0.7) semboller bir "küme" olarak
+gruplanır (bağlı bileşen/connected components algoritmasıyla). Aynı
+kümedeki sembollerin önerilen pozisyon büyüklüğü, küme büyüklüğüne göre
+aşağı çekilir — örneğin 3'lü bir kümede her biri 1/3'e iner, böylece
+küme toplamda tek bir bağımsız pozisyon kadar risk bütçesi kullanır.
+
+Yeni sütunlar (Özet sayfasında): `Korelasyon Kümesi`, `Düzeltilmiş
+Pozisyon ($)`, `Düzeltilmiş Portföy Yüzdesi %`. Yeni sayfa: **"Portföy
+Korelasyonu"** (Excel'de) / **🔗 Portföy Korelasyonu** (panelde) —
+korelasyon ısı haritası + küme özeti + uyarı.
+
+```bash
+python main_scan.py --skip-correlation-check  # atlamak istersen
+```
+
+**Dürüstlük notu:** Bu basit, sezgisel bir düzeltmedir — modern portföy
+teorisindeki gibi tam bir kovaryans optimizasyonu (risk paritesi vb.)
+YAPMAZ. En azından "bunlar birbirinden bağımsız değil" uyarısı verir ve
+kaba bir düzeltme sunar; profesyonel bir portföy yöneticisinin yerini
+tutmaz.
+
+### Bu turda bulunan bir hata daha
+
+`reporting/dashboard_charts.py`'ye yeni `correlation_heatmap()`
+fonksiyonu eklenirken, hemen altındaki `grid_ladder_chart()`
+fonksiyonunun `def` satırı yanlışlıkla silinmiş (gövdesi kalmış).
+Fonksiyonun kendi testi zaten var olduğu için (`test_grid_ladder_chart_*`)
+bu, testler çalıştırılır çalıştırılmaz hemen yakalandı — düzeltildi.
+Bu, sistemdeki her fonksiyonun neden ayrı test edilmesi gerektiğinin
+canlı bir örneği.
+
 ## 🆕 v10 — Çok Sayfalı Site, Tam Şeffaflık, Grid/DCA Emir Takibi
 
 ### "Emtia boş görünüyor" sorunu çözüldü — ama farklı bir sebeple
@@ -749,6 +796,6 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)
 - Gerçek NLP/LLM tabanlı haber duygu analizi (ücretli API gerektirir)
-- Portföy-seviyesi korelasyon kontrolü (birden fazla sinyal arasındaki bağımlılık analizi)
+- ~~Portföy-seviyesi korelasyon kontrolü~~ ✅ tamamlandı
 - Ichimoku Cloud, Stochastic osilatör gibi ek teknik göstergeler
 

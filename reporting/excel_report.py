@@ -27,6 +27,7 @@ DISPLAY_COLUMNS = [
     "atr_pct", "adx", "rsi", "fundamental_score", "relative_volume",
     "volume_confirmed", "mtf_confirmed", "stooq_close", "fark_yuzde", "supheli",
     "onerilen_adet", "pozisyon_buyuklugu", "portfoy_yuzdesi",
+    "korelasyon_kumesi", "efektif_pozisyon_buyuklugu", "efektif_portfoy_yuzdesi",
 ]
 
 COLUMN_LABELS = {
@@ -41,6 +42,8 @@ COLUMN_LABELS = {
     "supheli": "Veri Şüpheli mi",
     "onerilen_adet": "Önerilen Adet", "pozisyon_buyuklugu": "Pozisyon Büyüklüğü ($)",
     "portfoy_yuzdesi": "Portföy Yüzdesi %",
+    "korelasyon_kumesi": "Korelasyon Kümesi", "efektif_pozisyon_buyuklugu": "Düzeltilmiş Pozisyon ($)",
+    "efektif_portfoy_yuzdesi": "Düzeltilmiş Portföy Yüzdesi %",
 }
 
 FUNDAMENTAL_COLUMNS = [
@@ -168,6 +171,7 @@ def build_report(
     dca_plan_df: pd.DataFrame | None = None,
     full_status_df: pd.DataFrame | None = None,
     grid_dca_performance: dict | None = None,
+    portfolio_summary_stats: dict | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -367,6 +371,35 @@ def build_report(
         dca_perf_df = pd.DataFrame(dca_perf_rows)
         dca_perf_df.to_excel(writer, sheet_name="Grid ve DCA Performansı", index=False, startrow=dca_start_row)
         _autosize(ws, pd.concat([grid_perf_df, dca_perf_df], ignore_index=True))
+
+        # --- Portföy Korelasyonu ---
+        pcs = portfolio_summary_stats or {}
+        ws3 = writer.book.create_sheet("Portföy Korelasyonu")
+        ws3["A1"] = "Portföy-Seviyesi Korelasyon Özeti"
+        ws3["A1"].font = Font(bold=True)
+
+        if pcs and "not" not in pcs:
+            summary_rows = [
+                {"Metrik": "Naif toplam portföy yüzdesi % (sanki tüm sinyaller bağımsızmış gibi)",
+                 "Değer": pcs.get("naif_toplam_portfoy_yuzdesi")},
+                {"Metrik": "Düzeltilmiş toplam portföy yüzdesi % (korelasyon dikkate alınarak)",
+                 "Değer": pcs.get("duzeltilmis_toplam_portfoy_yuzdesi")},
+                {"Metrik": "Korelasyonlu küme sayısı", "Değer": pcs.get("kume_sayisi")},
+                {"Metrik": "Kümelenmiş sembol sayısı", "Değer": pcs.get("kumelenmis_sembol_sayisi")},
+                {"Metrik": "En yüksek ikili korelasyon", "Değer": pcs.get("en_yuksek_ikili_korelasyon")},
+            ]
+            pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Portföy Korelasyonu", index=False, startrow=1)
+
+            if pcs.get("uyari"):
+                warn_row = len(summary_rows) + 4
+                ws3[f"A{warn_row}"] = ("⚠️ UYARI: Bazı sinyalleriniz birbirine yüksek korelasyonlu — hepsini "
+                                        "aynı anda almak, bağımsız pozisyonlar almaktan daha riskli olabilir. "
+                                        "'Özet' sayfasındaki 'Korelasyon Kümesi' ve 'Düzeltilmiş Portföy "
+                                        "Yüzdesi' sütunlarına bakın.")
+                ws3[f"A{warn_row}"].font = Font(italic=True, color="B45309")
+            _autosize(ws3, pd.DataFrame(summary_rows))
+        else:
+            ws3["A2"] = pcs.get("not", "Korelasyon kontrolü yapılmadı (yetersiz sinyal veya --skip-correlation-check).")
 
         # --- Filtre özeti ---
         if filter_stats:

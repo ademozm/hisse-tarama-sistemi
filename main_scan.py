@@ -31,6 +31,7 @@ from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
     position_sizing, economic_calendar, grid_strategy, dca_plan, grid_dca_journal,
+    portfolio_correlation,
 )
 from reporting import excel_report
 
@@ -51,6 +52,7 @@ def run_scan(
     skip_fundamentals=False,
     skip_news=False,
     skip_cross_validation=False,
+    skip_correlation_check=False,
     filter_overrides=None,
     auto_refresh_universe=None,
     send_notification=True,
@@ -219,13 +221,37 @@ def run_scan(
         scored_df = position_sizing.compute_for_scored_df(scored_df, account_size, risk_per_trade_pct)
         logger.info(f"Pozisyon büyüklüğü önerileri hesaplandı (hesap: {account_size}, risk: %{risk_per_trade_pct})")
 
+    # --- 9.75) Portföy-seviyesi korelasyon kontrolü ---
+    # Aynı anda gelen sinyaller birbirine yüksek korelasyonluysa (örn. aynı
+    # sektör, ya da genel piyasayı takip ediyorlarsa), bunları bağımsız
+    # bahisler gibi boyutlandırmak gerçek riski olduğundan düşük gösterir.
+    portfolio_summary_stats = {}
+    if not skip_correlation_check and not scored_df.empty and len(scored_df) >= 2:
+        try:
+            signal_symbols = scored_df["symbol"].tolist()
+            corr_matrix = portfolio_correlation.compute_correlation_matrix(valid_data, signal_symbols)
+            clusters = portfolio_correlation.find_correlated_clusters(corr_matrix)
+            scored_df = portfolio_correlation.adjust_position_sizes(scored_df, clusters)
+            portfolio_summary_stats = portfolio_correlation.portfolio_summary(scored_df, corr_matrix, clusters)
+            if clusters:
+                logger.warning(f"{len(clusters)} korelasyonlu sinyal kümesi tespit edildi, "
+                                f"pozisyon büyüklükleri düzeltildi: {clusters}")
+        except Exception as e:
+            logger.warning(f"Portföy korelasyon kontrolü başarısız: {e}")
+    else:
+        logger.info("Portföy korelasyon kontrolü atlandı (--skip-correlation-check veya yetersiz sinyal).")
+
     # --- 9.8) Grid ve DCA plan önerileri ---
     grid_rows = []
     dca_rows = []
     if not scored_df.empty:
         for _, row in scored_df.iterrows():
             symbol = row["symbol"]
-            pozisyon = row.get("pozisyon_buyuklugu")
+            # Korelasyon düzeltmesi varsa onu kullan (efektif = gerçek riske göre
+            # ayarlanmış); yoksa (kontrol atlandıysa) ham pozisyon büyüklüğüne düş
+            pozisyon = row.get("efektif_pozisyon_buyuklugu")
+            if pd.isna(pozisyon) or pozisyon is None:
+                pozisyon = row.get("pozisyon_buyuklugu")
             if pd.isna(pozisyon) or pozisyon is None or symbol not in signals_by_symbol:
                 continue
 
@@ -305,6 +331,7 @@ def run_scan(
         dca_plan_df=dca_plan_df,
         full_status_df=full_status_df,
         grid_dca_performance={"grid": grid_perf, "dca": dca_perf},
+        portfolio_summary_stats=portfolio_summary_stats,
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---
@@ -331,6 +358,8 @@ if __name__ == "__main__":
                          help="Haber analizi çekimini atla (daha hızlı)")
     parser.add_argument("--skip-cross-validation", action="store_true",
                          help="Stooq ile çapraz fiyat doğrulamasını atla (daha hızlı)")
+    parser.add_argument("--skip-correlation-check", action="store_true",
+                         help="Portföy-seviyesi korelasyon kontrolünü atla (pozisyon büyüklükleri düzeltilmez)")
     parser.add_argument("--min-score", type=float, default=None, help="Minimum |bileşik skor|")
     parser.add_argument("--only-buy", action="store_true", help="Sadece AL sinyallerini göster")
     parser.add_argument("--only-sell", action="store_true", help="Sadece SAT sinyallerini göster")
@@ -365,6 +394,7 @@ if __name__ == "__main__":
         skip_fundamentals=args.skip_fundamentals,
         skip_news=args.skip_news,
         skip_cross_validation=args.skip_cross_validation,
+        skip_correlation_check=args.skip_correlation_check,
         filter_overrides=overrides,
         auto_refresh_universe=not args.no_auto_refresh,
         send_notification=not args.no_notify,

@@ -109,6 +109,22 @@ def volume_bar(ohlc_df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def correlation_heatmap(corr_matrix: pd.DataFrame) -> go.Figure:
+    """Sinyal üreten semboller arası korelasyon matrisini ısı haritası olarak gösterir."""
+    if corr_matrix is None or corr_matrix.empty:
+        return go.Figure().update_layout(title="Yeterli veri yok (en az 2 sinyal + yeterli fiyat geçmişi gerekli)")
+
+    fig = go.Figure(data=go.Heatmap(
+        z=corr_matrix.values, x=corr_matrix.columns.tolist(), y=corr_matrix.index.tolist(),
+        colorscale="RdYlGn", zmin=-1, zmax=1, text=corr_matrix.round(2).values,
+        texttemplate="%{text}", colorbar=dict(title="Korelasyon"),
+    ))
+    fig.update_layout(title="Sinyal Sembolleri Arası Korelasyon Matrisi",
+                       margin=dict(t=40, b=20, l=20, r=20),
+                       height=max(320, 30 * len(corr_matrix)))
+    return fig
+
+
 def grid_ladder_chart(grid_df_symbol: pd.DataFrame) -> go.Figure:
     """Bir sembolün grid seviyelerini merdiven (yatay çubuk) olarak gösterir."""
     if grid_df_symbol is None or grid_df_symbol.empty:

@@ -127,3 +127,20 @@ def test_dca_steps_chart_with_data():
 def test_dca_steps_chart_empty_handled():
     fig = charts.dca_steps_chart(pd.DataFrame())
     assert isinstance(fig, go.Figure)
+
+
+def test_correlation_heatmap_returns_figure_with_data():
+    corr = pd.DataFrame({"A": [1.0, 0.8], "B": [0.8, 1.0]}, index=["A", "B"])
+    fig = charts.correlation_heatmap(corr)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 1
+
+
+def test_correlation_heatmap_empty_handled():
+    fig = charts.correlation_heatmap(pd.DataFrame())
+    assert isinstance(fig, go.Figure)
+
+
+def test_correlation_heatmap_none_handled():
+    fig = charts.correlation_heatmap(None)
+    assert isinstance(fig, go.Figure)
