@@ -1,5 +1,5 @@
 """
-Hisse/Kripto/Emtia/Döviz Tarama Sistemi — Ana Sayfa
+Hisse/Kripto/Emtia Tarama Sistemi — Ana Sayfa
 
 Çok sayfalı panel: bu dosya "Ana Sayfa" (tarama başlatma + genel bakış).
 Diğer bölümler pages/ klasöründe, Streamlit bunları otomatik olarak sol
@@ -62,7 +62,7 @@ with st.sidebar:
     st.header("Tarama Ayarları")
 
     markets_labels = {"ABD Hisseleri (S&P 100)": "us", "BIST": "bist", "Kripto Paralar": "crypto",
-                       "Emtialar (Altın/Gümüş/Petrol/Doğalgaz)": "emtia", "Döviz Kurları (USD/TRY dahil)": "forex"}
+                       "Emtialar (Altın/Gümüş/Petrol/Doğalgaz)": "emtia"}
     selected_labels = st.multiselect("Hangi piyasalar taransın?", options=list(markets_labels.keys()),
                                       default=list(markets_labels.keys()))
     selected_markets = [markets_labels[l] for l in selected_labels]
@@ -207,7 +207,7 @@ else:
     st.info("Soldaki ayarları seç ve **'Taramayı Başlat'** butonuna bas.")
     st.markdown("""
     **İlk kez mi kullanıyorsun?**
-    1. Soldan taramak istediğin piyasaları seç (ABD / BIST / Kripto / Emtia / Döviz)
+    1. Soldan taramak istediğin piyasaları seç (ABD / BIST / Kripto / Emtia)
     2. Hızlı bir deneme için "Temel analizi atla" kutucuğunu işaretle
     3. "Taramayı Başlat" butonuna bas
     4. Birkaç dakika sonra: KPI kartları, genel bakış grafikleri burada; detaylı analiz sol menüdeki

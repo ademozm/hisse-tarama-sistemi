@@ -91,7 +91,7 @@ def update_crypto(top_n: int = 100) -> pd.DataFrame:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tam hisse/kripto listelerini güncelle")
     parser.add_argument("--markets", nargs="+", default=["us", "crypto"],
-                         choices=["us", "bist", "crypto", "emtia", "forex"])
+                         choices=["us", "bist", "crypto", "emtia"])
     parser.add_argument("--crypto-top-n", type=int, default=200,
                          help="Piyasa değerine göre ilk N kripto para (varsayılan 200, önceden 100'dü)")
     parser.add_argument("--us-extended", action="store_true",
@@ -115,9 +115,5 @@ if __name__ == "__main__":
 
     if "emtia" in args.markets:
         print("Emtia listesi statiktir, güncelleme gerekmez (data/universe_emtia.csv).")
-
-    if "forex" in args.markets:
-        print("Döviz kuru listesi statiktir, güncelleme gerekmez (data/universe_forex.csv). "
-              "Yeni bir döviz çifti eklemek istersen dosyayı elle düzenleyebilirsin.")
 
     print("\nBitti. main_scan.py bir sonraki çalıştırmada güncel listeleri kullanacak.")

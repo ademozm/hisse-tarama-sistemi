@@ -33,11 +33,6 @@ SPECIAL_MAP = {
     "XAGUSD=X": "xagusd",
     "CL=F": "cl.f",
     "NG=F": "ng.f",
-    "USDTRY=X": "usdtry",
-    "EURTRY=X": "eurtry",
-    "EURUSD=X": "eurusd",
-    "GBPUSD=X": "gbpusd",
-    "USDJPY=X": "usdjpy",
 }
 
 
@@ -49,7 +44,7 @@ def map_to_stooq(symbol: str, market: str) -> str | None:
     if market == "bist":
         return None  # Stooq'ta BIST kapsamı güvenilir değil
 
-    if market in ("emtia", "forex"):
+    if market == "emtia":
         # SPECIAL_MAP'te olmayan bir emtia/döviz sembolü varsa (kullanıcı
         # kendi CSV'sine ekleyebilir) genel bir tahmin yapılmıyor —
         # bu piyasalarda sembol formatı çok değişken, yanlış tahmin

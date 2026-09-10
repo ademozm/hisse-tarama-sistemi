@@ -13,7 +13,7 @@ st.caption("Sinyal üreten semboller, piyasa bazında (skor renk skalalı)")
 
 path, sheets = dc.require_report_or_stop()
 
-market_tab_names = [n for n in ["ABD", "BIST", "Kripto", "Emtialar", "Döviz"] if n in sheets]
+market_tab_names = [n for n in ["ABD", "BIST", "Kripto", "Emtialar"] if n in sheets]
 if not market_tab_names:
     st.info("Bu taramada hiçbir piyasada sinyal bulunamadı.")
 else:

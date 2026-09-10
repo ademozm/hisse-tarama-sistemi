@@ -17,7 +17,6 @@ UNIVERSE_FILES = {
     "bist": os.path.join(DATA_DIR, "universe_bist.csv"),
     "crypto": os.path.join(DATA_DIR, "universe_crypto.csv"),
     "emtia": os.path.join(DATA_DIR, "universe_emtia.csv"),
-    "forex": os.path.join(DATA_DIR, "universe_forex.csv"),
 }
 
 # Veri çekme ayarları
@@ -28,6 +27,18 @@ FETCH_BATCH_SIZE = 10        # Aynı anda kaç sembol indirilecek (rate-limit ko
 FETCH_BATCH_DELAY_SEC = 2    # Batch'ler arası bekleme
 FETCH_MAX_RETRIES = 3
 FETCH_RETRY_BACKOFF_SEC = 5
+
+# Bir sembol yfinance'ten TAMAMEN başarısız olursa (tüm denemeler tükenirse),
+# Stooq'a düşmeden ÖNCE bu alternatif Yahoo sembollerini de dener. Altın
+# defalarca sorun çıkardığı için (rollover boşlukları, Volume eksikliği gibi
+# farklı sebeplerle) burada birden fazla alternatif tutuluyor — biri
+# başarısız olsa da diğeri devreye girsin diye.
+ALTERNATE_TICKERS = {
+    "XAUUSD=X": ["GC=F"],
+    "GC=F": ["XAUUSD=X"],
+    "XAGUSD=X": ["SI=F"],
+    "SI=F": ["XAGUSD=X"],
+}
 
 # Veri doğrulama eşikleri
 MIN_ROWS_REQUIRED = 60          # En az bu kadar mum olmalı (ADX/EMA gibi göstergeler için)

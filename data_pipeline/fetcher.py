@@ -57,6 +57,21 @@ def _fetch_one(symbol: str, period: str, interval: str) -> pd.DataFrame:
 
             if result_df.empty:
                 raise ValueError("Fiyat verisi (Open/High/Low/Close) tamamen boş döndü")
+
+            # ÖNEMLİ (v12): Eskiden burada sadece "tamamen boş mu" kontrol
+            # ediliyordu — "yeterince veri var mı" kontrol edilmiyordu. Bu
+            # yüzden ör. bir vadeli işlem sözleşmesi (CL=F, NG=F gibi)
+            # rollover/sözleşme kısıtı yüzünden sadece birkaç günlük veri
+            # dönse bile bu fonksiyon "başarılı" sayıyordu — ne yeniden
+            # denenmiyor, ne alternatif sembol/Stooq yedeğine düşülüyordu.
+            # Yetersizlik sadece ÇOK SONRA, validator.py'de fark ediliyordu
+            # ve o noktada yedek kaynaklara geçmek için artık geç kalınmış
+            # oluyordu. Artık MIN_ROWS_REQUIRED burada da kontrol ediliyor.
+            if len(result_df) < config.MIN_ROWS_REQUIRED:
+                raise ValueError(
+                    f"Yetersiz veri: {len(result_df)} satır (min {config.MIN_ROWS_REQUIRED}) — "
+                    f"vadeli işlem sözleşmesi rollover kısıtı olabilir"
+                )
             return result_df
         except Exception as e:
             last_err = e
@@ -64,6 +79,26 @@ def _fetch_one(symbol: str, period: str, interval: str) -> pd.DataFrame:
             if attempt < config.FETCH_MAX_RETRIES:
                 time.sleep(config.FETCH_RETRY_BACKOFF_SEC * attempt)
     raise RuntimeError(f"{symbol} indirilemedi: {last_err}")
+
+
+def _fetch_with_alternates(symbol: str, period: str, interval: str) -> tuple[pd.DataFrame, str]:
+    """
+    _fetch_one'ı önce asıl sembolle, başarısız olursa config.ALTERNATE_TICKERS'taki
+    alternatiflerle dener. Dönüş: (DataFrame, kullanılan_sembol).
+    Hepsi başarısız olursa RuntimeError fırlatır (en son hatayı taşır).
+    """
+    candidates = [symbol] + config.ALTERNATE_TICKERS.get(symbol, [])
+    last_err = None
+    for candidate in candidates:
+        try:
+            df = _fetch_one(candidate, period, interval)
+            if candidate != symbol:
+                logger.info(f"{symbol}: asıl sembol başarısız oldu, alternatif '{candidate}' ile alındı.")
+            return df, candidate
+        except Exception as e:
+            last_err = e
+            continue
+    raise RuntimeError(f"{symbol} ve tüm alternatifleri başarısız: {last_err}")
 
 
 def fetch_universe(
@@ -100,9 +135,9 @@ def fetch_universe(
         batch = to_fetch[i:i + config.FETCH_BATCH_SIZE]
         for sym in batch:
             try:
-                df = _fetch_one(sym, period, interval)
+                df, used_ticker = _fetch_with_alternates(sym, period, interval)
                 result.data[sym] = df
-                result.sources[sym] = "yfinance"
+                result.sources[sym] = "yfinance" if used_ticker == sym else f"yfinance ({used_ticker})"
                 cache.set_cached(sym, interval, df)
             except Exception as e:
                 # yfinance tükendi; market biliniyorsa Stooq'u dene (ikinci kaynak)

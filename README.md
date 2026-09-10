@@ -210,6 +210,56 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
+## 🆕 v12 — Döviz Kaldırıldı, Emtia'da Gerçek Kök Sebep Bulundu
+
+### Döviz kurları piyasası kaldırıldı
+
+Kullanıcı isteği üzerine — sistem artık sadece **ABD, BIST, Kripto,
+Emtia** taranıyor. `data/universe_forex.csv` silindi, tüm kod
+yollarından "forex" referansları temizlendi.
+
+### Emtia'da üçüncü kez çıkan hatanın GERÇEK kök sebebi
+
+Önceki iki turda (v5, v9) Volume-NaN ve ticker seçimi sorunlarını
+düzelttik ama sorun devam etti. Bu sefer kod tabanını satır satır
+denetleyerek asıl kök sebebi bulduk:
+
+**`data_pipeline/fetcher.py > _fetch_one`, veri "tamamen boş değilse"
+başarılı sayıyordu — `MIN_ROWS_REQUIRED` (60 gün) kontrolünü HİÇ
+yapmıyordu.** Yani `CL=F` gibi bir vadeli işlem sözleşmesi (rollover
+kısıtı yüzünden) sadece 5-10 günlük veri dönse bile bu "başarılı"
+sayılıp cache'leniyordu — ne yeniden deneniyor, ne Stooq yedeğine
+düşülüyordu. Yetersizlik sadece ÇOK SONRA, `validator.py`'de fark
+ediliyordu ve o noktada yedek kaynağa geçmek için artık geç
+kalınmış oluyordu.
+
+**Düzeltme:** `MIN_ROWS_REQUIRED` kontrolü artık `_fetch_one` içinde de
+yapılıyor — yetersiz veri artık gerçek bir "başarısızlık" sayılıyor,
+yeniden deneme + yedek kaynak zincirini tetikliyor.
+
+### Yeni: alternatif sembol zinciri
+
+`config.py > ALTERNATE_TICKERS`: bir sembol yfinance'ten tüm
+denemelerinde başarısız olursa, Stooq'a düşmeden ÖNCE alternatif Yahoo
+sembolleri de deneniyor:
+
+```python
+ALTERNATE_TICKERS = {
+    "XAUUSD=X": ["GC=F"],   # spot başarısız olursa vadeliye düş
+    "GC=F": ["XAUUSD=X"],   # ya da tam tersi
+    "XAGUSD=X": ["SI=F"],
+    "SI=F": ["XAGUSD=X"],
+}
+```
+
+Şimdi altın için üç kademeli bir güvenlik ağı var: **spot ticker →
+vadeli ticker (alternatif) → Stooq (bağımsız kaynak)**. Üçü birden aynı
+anda başarısız olma ihtimali, tek bir kaynağa bağımlı olmaktan çok
+daha düşük.
+
+`tests/test_fetcher.py`'ye bu tam senaryoyu (yetersiz veri → alternatif
+sembole geçiş) kapsayan regresyon testleri eklendi.
+
 ## 🆕 v11 — Portföy-Seviyesi Korelasyon Kontrolü
 
 ### Sorun neydi?
@@ -792,6 +842,7 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Çok sayfalı site tasarımı~~ ✅ tamamlandı
 - ~~Tüm sembol durumu şeffaflığı (sinyal üretmeyenler dahil)~~ ✅ tamamlandı
 - ~~Grid & DCA emir takibi + ayrı kazanma oranı hesaplama~~ ✅ tamamlandı
+- ~~Döviz kaldırma + emtia veri hatasının gerçek kök sebebini bulma~~ ✅ tamamlandı
 - ~~Walk-forward parametre optimizasyonu scripti~~ ✅ tamamlandı (`run_walk_forward.py`)
 - Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
 - E-posta bildirimi (şu an sadece Telegram var)

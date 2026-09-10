@@ -227,13 +227,13 @@ def build_report(
 
         # --- Piyasa bazlı tam sonuçlar ---
         for market, label in [("us", "ABD"), ("bist", "BIST"), ("crypto", "Kripto"),
-                               ("emtia", "Emtialar"), ("forex", "Döviz")]:
+                               ("emtia", "Emtialar")]:
             market_df = scored_df[scored_df["market"] == market] if not scored_df.empty else scored_df
             _write_generic_sheet(writer, market_df, label, DISPLAY_COLUMNS, COLUMN_LABELS,
                                   score_col="composite_score")
 
         # --- Temel analiz detayı ---
-        fundamental_df = scored_df[~scored_df["market"].isin(["crypto", "emtia", "forex"])] if not scored_df.empty else scored_df
+        fundamental_df = scored_df[~scored_df["market"].isin(["crypto", "emtia"])] if not scored_df.empty else scored_df
         _write_generic_sheet(writer, fundamental_df, "Temel Analiz", FUNDAMENTAL_COLUMNS, FUNDAMENTAL_LABELS)
 
         # --- Gelişmiş göstergeler (Fibonacci, destek/direnç, hacim profili) ---

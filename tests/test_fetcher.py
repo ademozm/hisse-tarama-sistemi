@@ -41,11 +41,11 @@ def test_fetch_one_all_nan_volume_does_not_wipe_all_rows():
 
 
 def test_fetch_one_nan_in_close_price_drops_only_that_row():
-    df = _make_ohlcv_df(50)
+    df = _make_ohlcv_df(100)
     df.iloc[10, df.columns.get_loc("Close")] = np.nan
     with patch("data_pipeline.fetcher.yf.download", return_value=df):
         result = fetcher._fetch_one("AAPL", "1y", "1d")
-    assert len(result) == 49
+    assert len(result) == 99
 
 
 def test_fetch_one_empty_download_raises():
@@ -55,7 +55,7 @@ def test_fetch_one_empty_download_raises():
 
 
 def test_fetch_one_multiindex_columns_flattened():
-    df = _make_ohlcv_df(30)
+    df = _make_ohlcv_df(100)
     df.columns = pd.MultiIndex.from_product([df.columns, ["AAPL"]])
     with patch("data_pipeline.fetcher.yf.download", return_value=df):
         result = fetcher._fetch_one("AAPL", "1y", "1d")
@@ -63,7 +63,7 @@ def test_fetch_one_multiindex_columns_flattened():
 
 
 def test_fetch_one_retries_on_failure_then_succeeds():
-    df = _make_ohlcv_df(30)
+    df = _make_ohlcv_df(100)
     call_count = {"n": 0}
 
     def side_effect(*args, **kwargs):
@@ -75,8 +75,61 @@ def test_fetch_one_retries_on_failure_then_succeeds():
     with patch("data_pipeline.fetcher.yf.download", side_effect=side_effect):
         with patch("data_pipeline.fetcher.time.sleep"):  # testte gerçekten bekleme
             result = fetcher._fetch_one("AAPL", "1y", "1d")
-    assert len(result) == 30
+    assert len(result) == 100
     assert call_count["n"] == 2
+
+
+def test_fetch_one_insufficient_rows_raises():
+    """
+    REGRESYON TESTİ: Bu, gerçek altın/emtia hatasının kök sebebini yakalıyor.
+    Bir vadeli işlem sözleşmesi (CL=F, NG=F gibi) rollover kısıtı yüzünden
+    MIN_ROWS_REQUIRED'in altında veri dönebilir. Eskiden bu "başarılı" sayılıp
+    sessizce cache'leniyordu, yedek kaynağa hiç düşülmüyordu — sadece çok
+    sonra validator.py'de fark ediliyordu. Artık burada da kontrol ediliyor.
+    """
+    df = _make_ohlcv_df(30)  # config.MIN_ROWS_REQUIRED (60) altında
+    with patch("data_pipeline.fetcher.yf.download", return_value=df):
+        with patch("data_pipeline.fetcher.time.sleep"):
+            with pytest.raises(RuntimeError, match="Yetersiz veri"):
+                fetcher._fetch_one("CL=F", "1y", "1d")
+
+
+def test_fetch_with_alternates_uses_primary_when_it_succeeds():
+    df = _make_ohlcv_df(100)
+    with patch("data_pipeline.fetcher.yf.download", return_value=df):
+        result_df, used_ticker = fetcher._fetch_with_alternates("XAUUSD=X", "1y", "1d")
+    assert used_ticker == "XAUUSD=X"
+    assert len(result_df) == 100
+
+
+def test_fetch_with_alternates_falls_back_to_alternate_ticker():
+    good_df = _make_ohlcv_df(100)
+    bad_df = _make_ohlcv_df(10)  # yetersiz
+
+    def side_effect(symbol, *args, **kwargs):
+        return bad_df if symbol == "XAUUSD=X" else good_df
+
+    with patch("data_pipeline.fetcher.yf.download", side_effect=side_effect):
+        with patch("data_pipeline.fetcher.time.sleep"):
+            result_df, used_ticker = fetcher._fetch_with_alternates("XAUUSD=X", "1y", "1d")
+    assert used_ticker == "GC=F"  # config.ALTERNATE_TICKERS'taki alternatif
+    assert len(result_df) == 100
+
+
+def test_fetch_with_alternates_all_fail_raises():
+    bad_df = _make_ohlcv_df(5)
+    with patch("data_pipeline.fetcher.yf.download", return_value=bad_df):
+        with patch("data_pipeline.fetcher.time.sleep"):
+            with pytest.raises(RuntimeError, match="tüm alternatifleri başarısız"):
+                fetcher._fetch_with_alternates("XAUUSD=X", "1y", "1d")
+
+
+def test_fetch_with_alternates_symbol_without_alternates_raises_normally():
+    bad_df = _make_ohlcv_df(5)
+    with patch("data_pipeline.fetcher.yf.download", return_value=bad_df):
+        with patch("data_pipeline.fetcher.time.sleep"):
+            with pytest.raises(RuntimeError):
+                fetcher._fetch_with_alternates("AAPL", "1y", "1d")  # alternatifi yok
 
 
 def test_fetch_universe_uses_cache_when_available():

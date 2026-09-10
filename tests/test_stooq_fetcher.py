@@ -14,19 +14,10 @@ def test_map_to_stooq_special_map_commodities():
     assert stooq_fetcher.map_to_stooq("NG=F", "emtia") == "ng.f"
 
 
-def test_map_to_stooq_special_map_forex():
-    assert stooq_fetcher.map_to_stooq("USDTRY=X", "forex") == "usdtry"
-    assert stooq_fetcher.map_to_stooq("EURUSD=X", "forex") == "eurusd"
-
-
 def test_map_to_stooq_unmapped_emtia_symbol_returns_none():
     """SPECIAL_MAP'te olmayan bir emtia sembolü için genel tahmin YAPILMAMALI
     (yanlış tahmin sessizce yanlış veriye yol açabilir)."""
     assert stooq_fetcher.map_to_stooq("XPTUSD=X", "emtia") is None
-
-
-def test_map_to_stooq_unmapped_forex_symbol_returns_none():
-    assert stooq_fetcher.map_to_stooq("USDCAD=X", "forex") is None
 
 
 def test_map_to_stooq_bist_unsupported():

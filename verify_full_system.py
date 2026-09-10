@@ -45,7 +45,7 @@ def make_synthetic(symbol, n=300, seed=None):
 
 
 def make_synthetic_fundamentals(symbol, market, seed=None):
-    if market in ("crypto", "emtia", "forex"):
+    if market in ("crypto", "emtia"):
         return {}
     seed = seed if seed is not None else abs(hash(symbol)) % (2**32)
     rng = np.random.default_rng(seed)
@@ -260,11 +260,11 @@ for name, sheet in sheets.items():
     print(f"  - {name}: {len(sheet)} satır")
 
 print("[16/16] Sayfa bütünlüğü doğrulanıyor...")
-expected_sheets = {"Özet", "Filtrelenmiş", "ABD", "BIST", "Kripto", "Emtialar", "Döviz", "Temel Analiz",
+expected_sheets = {"Özet", "Filtrelenmiş", "ABD", "BIST", "Kripto", "Emtialar", "Temel Analiz",
                    "Tüm Sembol Durumu", "Piyasa Özeti", "Grid ve DCA Performansı", "Portföy Korelasyonu",
                    "Gelişmiş Göstergeler", "Risk Metrikleri", "Performans Geçmişi",
                    "Filtre Özeti", "Hata Raporu", "Haberler", "Ekonomik Takvim",
                    "Grid Planı", "DCA Planı"}
 assert expected_sheets.issubset(set(sheets.keys())), f"Eksik sayfa(lar): {expected_sheets - set(sheets.keys())}"
 
-print("\n✓ TÜM SİSTEM (v11: PORTFÖY-SEVİYESİ KORELASYON KONTROLÜ DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")
+print("\n✓ TÜM SİSTEM (v12: DÖVİZ KALDIRILDI + EMTİA KÖK SEBEP DÜZELTMESİ + ALTERNATİF SEMBOL ZİNCİRİ DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")
