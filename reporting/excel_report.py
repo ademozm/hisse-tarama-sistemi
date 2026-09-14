@@ -172,6 +172,7 @@ def build_report(
     full_status_df: pd.DataFrame | None = None,
     grid_dca_performance: dict | None = None,
     portfolio_summary_stats: dict | None = None,
+    paper_trading_stats: dict | None = None,
 ):
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         # --- Özet: en iyi 20 al / en iyi 20 sat (filtrelenmemiş tüm evrenden) ---
@@ -400,6 +401,32 @@ def build_report(
             _autosize(ws3, pd.DataFrame(summary_rows))
         else:
             ws3["A2"] = pcs.get("not", "Korelasyon kontrolü yapılmadı (yetersiz sinyal veya --skip-correlation-check).")
+
+        # --- Paper Trading (Sanal Portföy) ---
+        pts = paper_trading_stats or {}
+        ws4 = writer.book.create_sheet("Paper Trading")
+        ws4["A1"] = "Sanal Portföy Performansı"
+        ws4["A1"].font = Font(bold=True)
+
+        if pts and "not" not in pts:
+            pt_rows = [
+                {"Metrik": "Başlangıç bakiyesi ($)", "Değer": pts.get("baslangic_bakiyesi")},
+                {"Metrik": "Mevcut equity ($)", "Değer": pts.get("mevcut_equity")},
+                {"Metrik": "Nakit ($)", "Değer": pts.get("nakit")},
+                {"Metrik": "Toplam getiri %", "Değer": pts.get("toplam_getiri_pct")},
+                {"Metrik": "Açık pozisyon sayısı", "Değer": pts.get("acik_pozisyon_sayisi")},
+                {"Metrik": "Kapanan işlem sayısı", "Değer": pts.get("kapanan_islem_sayisi")},
+                {"Metrik": "Kazanma oranı %", "Değer": pts.get("kazanma_orani_pct") or "Henüz yeterli veri yok"},
+                {"Metrik": "Ortalama işlem getirisi %", "Değer": pts.get("ortalama_islem_getirisi_pct") or "Henüz yeterli veri yok"},
+                {"Metrik": "Maksimum düşüş %", "Değer": pts.get("maksimum_dusus_pct") or "Henüz yeterli veri yok"},
+                {"Metrik": "Sharpe oranı", "Değer": pts.get("sharpe_orani") or "Henüz yeterli veri yok"},
+                {"Metrik": "Kayıtlı gün sayısı", "Değer": pts.get("gunluk_kayit_sayisi")},
+            ]
+            pt_df = pd.DataFrame(pt_rows)
+            pt_df.to_excel(writer, sheet_name="Paper Trading", index=False, startrow=1)
+            _autosize(ws4, pt_df)
+        else:
+            ws4["A2"] = pts.get("not", "Paper trading verisi yok (--skip-paper-trading kullanılmış olabilir).")
 
         # --- Filtre özeti ---
         if filter_stats:

@@ -210,6 +210,57 @@ Ağırlıklar `config.py > SCORE_WEIGHTS` içinden değiştirilebilir.
 9. **Haber "analizi" basit anahtar kelime sayımıdır, gerçek NLP değil.**
    Detaylar için yukarıdaki "v4 — Haber analizi" bölümüne bakın.
 
+## 🆕 v13 — Paper Trading (Sanal Portföy)
+
+### Neden gerekliydi?
+
+`journal.py` ve `grid_dca_journal.py` TEKİL sinyalleri/emirleri takip
+ediyordu ("bu sinyal tuttu mu"). Ama "sistemin sinyallerini gerçekten
+takip etseydim param şu an ne durumda olurdu" sorusuna cevap veren
+GERÇEK BİR PORTFÖY simülasyonu yoktu.
+
+### Ne yapıyor?
+
+`analysis/paper_trading.py` (SQLite tabanlı), her taramada:
+- **Açık pozisyonları günceller**: stop/hedef seviyesine değdi mi kontrol
+  eder, değdiyse kapatır
+- **Yeni sinyalleri işler**: AL sinyali + o sembolde açık pozisyon yoksa
+  + yeterli nakit varsa → yeni pozisyon açar (miktar: position_sizing.py
+  + portfolio_correlation.py'nin zaten hesapladığı, korelasyon-düzeltmeli
+  öneri). SAT sinyali + açık pozisyon varsa → pozisyonu kapatır (çıkış
+  sinyali olarak)
+- **Equity anlık görüntüsü kaydeder**: nakit + açık pozisyonların güncel
+  piyasa değeri, zaman içinde bir equity eğrisi oluşturur
+
+Yeni sayfa: **"Paper Trading"** (Excel) / **💼 Paper Trading** (panel) —
+başlangıç bakiyesi, mevcut equity, toplam getiri, kazanma oranı,
+Sharpe oranı, maksimum düşüş.
+
+```bash
+python main_scan.py --skip-paper-trading  # atlamak istersen
+```
+
+**Sistem, açığa satış YAPMAZ** — sadece uzun (long) pozisyonları yönetir,
+SAT sinyalini "çıkış" olarak yorumlar. Bu, karmaşıklığı ve riski sınırlı
+tutmak için bilinçli bir tasarım kararı.
+
+### Bu turda yaşanan (ve çözülen) ciddi bir olay
+
+Bu özelliği geliştirirken **sandbox ortamı tamamen sıfırlandı** —
+`/home/claude/trading_system` klasörünün TAMAMI kayboldu. Neyse ki bir
+önceki teslim edilen zip dosyası (`/mnt/user-data/outputs/`) hâlâ
+duruyordu — sistem oradan geri yüklenip kaldığı yerden devam edildi,
+hiçbir iş kaybı olmadı. **Bu, düzenli olarak teslim edilen zip
+dosyalarının aynı zamanda bir yedek işlevi gördüğünün kanıtı** — eğer
+kendi bilgisayarında da GitHub'a düzenli push yapıyorsan, benzer bir
+güvenlik ağın var demektir.
+
+Ayrıca bu turda, `update_open_positions`'ın testlerinde grid_dca_journal
+testlerinde daha önce yakaladığımızla AYNI KATEGORİ bir zamanlama sorunu
+çıktı (test verisi sabit eski bir tarihte, kod ise gerçek `datetime.now()`
+kullanıyor) — aynı prensiple (fiyat verisinin sonunu gerçek "şimdi"den
+ileriye sabitleyerek) çözüldü.
+
 ## 🆕 v12 — Döviz Kaldırıldı, Emtia'da Gerçek Kök Sebep Bulundu
 
 ### Döviz kurları piyasası kaldırıldı
@@ -844,7 +895,7 @@ sıklığıyla fazlasıyla yeterli); public repo'larda sınırsız.
 - ~~Grid & DCA emir takibi + ayrı kazanma oranı hesaplama~~ ✅ tamamlandı
 - ~~Döviz kaldırma + emtia veri hatasının gerçek kök sebebini bulma~~ ✅ tamamlandı
 - ~~Walk-forward parametre optimizasyonu scripti~~ ✅ tamamlandı (`run_walk_forward.py`)
-- Paper trading (kağıt üzerinde) takip modülü — journal.py bunun temelini atıyor ama gerçek zamanlı simülasyon değil
+- ~~Paper trading (kağıt üzerinde) takip modülü~~ ✅ tamamlandı
 - E-posta bildirimi (şu an sadece Telegram var)
 - Gerçek NLP/LLM tabanlı haber duygu analizi (ücretli API gerektirir)
 - ~~Portföy-seviyesi korelasyon kontrolü~~ ✅ tamamlandı

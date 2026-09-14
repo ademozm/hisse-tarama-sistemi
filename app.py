@@ -53,6 +53,7 @@ with st.sidebar:
     st.page_link("pages/5_Grid_DCA.py", label="Grid & DCA", icon="🎯")
     st.page_link("pages/5b_Grid_DCA_Performans.py", label="Grid & DCA Performansı", icon="📊")
     st.page_link("pages/10_Portfoy_Korelasyon.py", label="Portföy Korelasyonu", icon="🔗")
+    st.page_link("pages/11_Paper_Trading.py", label="Paper Trading", icon="💼")
     st.page_link("pages/6_Haberler.py", label="Haberler", icon="📰")
     st.page_link("pages/7_Takvim.py", label="Ekonomik Takvim", icon="📅")
     st.page_link("pages/8_Performans.py", label="Geçmiş Performans", icon="📜")

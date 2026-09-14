@@ -174,6 +174,21 @@ if not scored_df.empty:
         assert "korelasyon_kumesi" in scored_df.columns
         assert "efektif_portfoy_yuzdesi" in scored_df.columns
 
+print("[10.8/15] Paper trading test ediliyor...")
+test_pt_db = "/home/claude/trading_system/data/test_verify_paper.db"
+if os.path.exists(test_pt_db):
+    os.remove(test_pt_db)
+from analysis import paper_trading
+paper_trading.initialize_account(10000.0, db_path=test_pt_db)
+paper_trading.update_open_positions(valid_data, db_path=test_pt_db)
+if not scored_df.empty:
+    pt_stats = paper_trading.process_new_signals(scored_df, signals, db_path=test_pt_db)
+    print(f"        Paper trading işlemleri: {pt_stats}")
+paper_trading.record_equity_snapshot(valid_data, db_path=test_pt_db)
+paper_perf = paper_trading.compute_performance_stats(db_path=test_pt_db)
+print(f"        Paper trading performansı: {paper_perf}")
+os.remove(test_pt_db)
+
 print("[11/15] Ekonomik takvim test ediliyor...")
 calendar_df = economic_calendar.get_calendar()
 print(f"        {len(calendar_df)} yaklaşan ekonomik olay bulundu (0 olması da normal, tarihe bağlı)")
@@ -247,7 +262,8 @@ excel_report.build_report(scored_df, validation_report, output_path,
                            calendar_df=calendar_df, grid_plan_df=grid_plan_df, dca_plan_df=dca_plan_df,
                            full_status_df=full_status_df,
                            grid_dca_performance={"grid": grid_perf, "dca": dca_perf},
-                           portfolio_summary_stats=portfolio_summary_stats)
+                           portfolio_summary_stats=portfolio_summary_stats,
+                           paper_trading_stats=paper_perf)
 
 # Telegram yapılandırılmamış olduğu için False dönmeli, hata FIRLATMAMALI
 notified = notifier.notify_scan_complete(filtered_df, filter_stats, output_path)
@@ -262,9 +278,10 @@ for name, sheet in sheets.items():
 print("[16/16] Sayfa bütünlüğü doğrulanıyor...")
 expected_sheets = {"Özet", "Filtrelenmiş", "ABD", "BIST", "Kripto", "Emtialar", "Temel Analiz",
                    "Tüm Sembol Durumu", "Piyasa Özeti", "Grid ve DCA Performansı", "Portföy Korelasyonu",
+                   "Paper Trading",
                    "Gelişmiş Göstergeler", "Risk Metrikleri", "Performans Geçmişi",
                    "Filtre Özeti", "Hata Raporu", "Haberler", "Ekonomik Takvim",
                    "Grid Planı", "DCA Planı"}
 assert expected_sheets.issubset(set(sheets.keys())), f"Eksik sayfa(lar): {expected_sheets - set(sheets.keys())}"
 
-print("\n✓ TÜM SİSTEM (v12: DÖVİZ KALDIRILDI + EMTİA KÖK SEBEP DÜZELTMESİ + ALTERNATİF SEMBOL ZİNCİRİ DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")
+print("\n✓ TÜM SİSTEM (v13: PAPER TRADING SANAL PORTFÖY DAHİL) UÇTAN UCA BAŞARIYLA ÇALIŞTI.")

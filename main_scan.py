@@ -31,7 +31,7 @@ from analysis import (
     scorer, fundamentals, relative_strength, confirmations, risk_metrics,
     filters, advanced_indicators, journal, notifier, news,
     position_sizing, economic_calendar, grid_strategy, dca_plan, grid_dca_journal,
-    portfolio_correlation,
+    portfolio_correlation, paper_trading,
 )
 from reporting import excel_report
 
@@ -53,6 +53,7 @@ def run_scan(
     skip_news=False,
     skip_cross_validation=False,
     skip_correlation_check=False,
+    skip_paper_trading=False,
     filter_overrides=None,
     auto_refresh_universe=None,
     send_notification=True,
@@ -241,6 +242,23 @@ def run_scan(
     else:
         logger.info("Portföy korelasyon kontrolü atlandı (--skip-correlation-check veya yetersiz sinyal).")
 
+    # --- 9.77) Paper trading: sanal portföyü güncelle ---
+    paper_perf = {}
+    if not skip_paper_trading:
+        try:
+            paper_trading.initialize_account(account_size)
+            paper_trading.update_open_positions(valid_data)  # önce açık pozisyonları kontrol et (stop/hedef)
+            if not scored_df.empty:
+                pt_stats = paper_trading.process_new_signals(scored_df, signals_by_symbol)
+                logger.info(f"Paper trading: {pt_stats}")
+            paper_trading.record_equity_snapshot(valid_data)
+            paper_perf = paper_trading.compute_performance_stats()
+            logger.info(f"Paper trading performansı: {paper_perf}")
+        except Exception as e:
+            logger.warning(f"Paper trading güncellenemedi: {e}")
+    else:
+        logger.info("Paper trading atlandı (--skip-paper-trading).")
+
     # --- 9.8) Grid ve DCA plan önerileri ---
     grid_rows = []
     dca_rows = []
@@ -332,6 +350,7 @@ def run_scan(
         full_status_df=full_status_df,
         grid_dca_performance={"grid": grid_perf, "dca": dca_perf},
         portfolio_summary_stats=portfolio_summary_stats,
+        paper_trading_stats=paper_perf,
     )
 
     # --- 13) Telegram bildirimi (yapılandırılmışsa) ---
@@ -360,6 +379,8 @@ if __name__ == "__main__":
                          help="Stooq ile çapraz fiyat doğrulamasını atla (daha hızlı)")
     parser.add_argument("--skip-correlation-check", action="store_true",
                          help="Portföy-seviyesi korelasyon kontrolünü atla (pozisyon büyüklükleri düzeltilmez)")
+    parser.add_argument("--skip-paper-trading", action="store_true",
+                         help="Sanal portföy (paper trading) güncellemesini atla")
     parser.add_argument("--min-score", type=float, default=None, help="Minimum |bileşik skor|")
     parser.add_argument("--only-buy", action="store_true", help="Sadece AL sinyallerini göster")
     parser.add_argument("--only-sell", action="store_true", help="Sadece SAT sinyallerini göster")
@@ -395,6 +416,7 @@ if __name__ == "__main__":
         skip_news=args.skip_news,
         skip_cross_validation=args.skip_cross_validation,
         skip_correlation_check=args.skip_correlation_check,
+        skip_paper_trading=args.skip_paper_trading,
         filter_overrides=overrides,
         auto_refresh_universe=not args.no_auto_refresh,
         send_notification=not args.no_notify,
